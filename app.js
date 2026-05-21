@@ -1,4 +1,6 @@
-// ================= CONFIGURATION & INITIALIZATION =================
+// =========================================================================
+// 💎 CONFIGURATION & INITIALIZATION
+// =========================================================================
 const firebaseConfig = {
     apiKey: "AIzaSyDml5oxrAMvMruHQmcMn6neMhdVfGrDY6A",
     authDomain: "chat-app-b46c7.firebaseapp.com",
@@ -12,7 +14,9 @@ if (!firebase.apps.length) {
 }
 const db = firebase.database();
 
-// ================= ARCHITECTURAL STATE HOOKS =================
+// =========================================================================
+// 💎 ARCHITECTURAL STATE HOOKS
+// =========================================================================
 let me = null;
 let chatWith = null;
 let msgRef = null;
@@ -28,7 +32,6 @@ let videoEnabled = true;
 // Shared Inbound ICE Candidate Queue (Fixes asynchronous race conditions on mobile hardware)
 let remoteIceCandidatesQueue = [];
 
-
 // FIXED: Expanded STUN fallback cluster arrays to aggressively force media paths across dynamic cellular configurations
 const servers = {
     iceServers: [
@@ -39,7 +42,9 @@ const servers = {
     iceCandidatePoolSize: 10
 };
 
-// ================= CONNECT HANDSHAKER =================
+// =========================================================================
+// 💎 CONNECT HANDSHAKER
+// =========================================================================
 function login() {
     const phone = document.getElementById("phone").value.trim();
     if (!phone) {
@@ -72,133 +77,19 @@ function login() {
         // Spin Up background operational runtimes
         loadUsers();
         startPresence();
-        // ================= PERSONALIZED REGISTRATION STORAGE LAYER =================
-        // ================= COMPACT MOUNTED STORAGE LAYER =================
-           // =========================================================================
-// 💎 INSTAGRAM STATUS NOTES & LIVE SPOTIFY LINK CORE LOGIC PLATFORM
-// =========================================================================
-
-// 1. UI DISPLAY MANAGER: Safely controls popup modal states
-function toggleStatusNotePopup() {
-    const popup = document.getElementById("statusNoteConfigPopup");
-    if (!popup) return;
-    
-    const isHidden = popup.style.display === "none" || popup.style.display === "";
-    popup.style.display = isHidden ? "flex" : "none";
-    
-    // Auto-focus input fields when modal opens up
-    if (isHidden) {
-        document.getElementById("statusNoteInput").focus();
-    }
-}
-
-// 2. DATA BROADCASTER: Validates parameters and commits links to Firebase
-function publishProfileStatusNote() {
-    const noteText = document.getElementById("statusNoteInput").value.trim();
-    const rawSpotifyUrl = document.getElementById("statusSpotifyInput").value.trim();
-
-    if (!noteText) {
-        alert("Please enter what is on your mind before sharing!");
-        return;
-    }
-
-    let trackId = "";
-    // Clean regex extraction pipeline to grab the unique song ID safely out of a live sharing link
-    if (rawSpotifyUrl.includes("spotify.com")) {
-        const matches = rawSpotifyUrl.match(/track\/([a-zA-Z0-9]+)/);
-        if (matches && matches[1]) trackId = matches[1];
-    } else if (rawSpotifyUrl.length > 5) {
-        trackId = rawSpotifyUrl; // Fallback string pass if they entered the raw ID hash
-    }
-
-    const notePayload = {
-        note: noteText,
-        spotifyTrackId: trackId,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-    };
-
-    db.ref(`statusNotes/${me}`).set(notePayload).then(() => {
-        document.getElementById("statusNoteInput").value = "";
-        document.getElementById("statusSpotifyInput").value = "";
-        toggleStatusNotePopup();
-    }).catch(err => console.error("Realtime Node status entry lock failure:", err));
-}
-
-// 3. SYNCHRONIZATION FEED ENGINE: Binds real-time updates clean inside your directory layout cards
-function listenForNetworkStatusNotes() {
-    if (!me) return;
-
-    // A. Track Personal Profile Element State Displays
-    db.ref(`statusNotes/${me}`).on("value", snap => {
-        const data = snap.val();
-        const floatingBubble = document.getElementById("myFloatingBubbleNote");
-        const trackDisplay = document.getElementById("myProfileTrackText");
-
-        if (data) {
-            if (floatingBubble) {
-                floatingBubble.innerText = data.note;
-                floatingBubble.style.display = "block";
-            }
-            if (trackDisplay) {
-                trackDisplay.innerHTML = data.spotifyTrackId 
-                    ? `<a href="https://open.spotify.com/track/${data.spotifyTrackId}" target="_blank" style="color:#1ed760; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><i class="fa-brands fa-spotify"></i> Live Track Linked</a>`
-                    : `<span style="color:rgba(255,255,255,0.4);"><i class="fa-regular fa-comment-dots"></i> ${data.note}</span>`;
-            }
-        }
-    });
-
-    // B. Inject Real-Time Activity Status Badges directly below friend cards inside loadUsers()
-    db.ref("statusNotes").on("value", snap => {
-        const globalNotesMatrix = snap.val() || {};
-        
-        // Find every active rendered companion component node block on your screen layout
-        const targetContactCards = document.querySelectorAll(".chat-item");
-        
-        targetContactCards.forEach(card => {
-            const nameField = card.querySelector(".chat-name");
-            if (!nameField) return;
-            
-            const cardUserPhone = nameField.innerText.trim();
-            const matchingStatus = globalNotesMatrix[cardUserPhone];
-
-            // Safely sweep out any old elements to protect against duplicates
-            const oldNoteRow = card.querySelector(".contact-insta-note-row");
-            if (oldNoteRow) oldNoteRow.remove();
-
-            if (matchingStatus) {
-                const noteRowElement = document.createElement("div");
-                noteRowElement.className = "contact-insta-note-row";
-                noteRowElement.style.cssText = "font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-top: 6px; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); min-width: 0; width: 100%; box-sizing: border-box;";
-
-                let trackActionBadge = "";
-                if (matchingStatus.spotifyTrackId) {
-                    trackActionBadge = `
-                        <a href="https://open.spotify.com/track/${matchingStatus.spotifyTrackId}" target="_blank" onclick="event.stopPropagation();" style="color: #1ed760; background: rgba(30,215,96,0.1); padding: 2px 6px; border-radius: 10px; font-size: 0.62rem; text-decoration: none; display: flex; align-items: center; gap: 3px; font-weight: 600; flex-shrink: 0; margin-left: 6px;">
-                            <i class="fa-brands fa-spotify"></i> Song
-                        </a>`;
-                }
-
-                noteRowElement.innerHTML = `
-                    <span style="font-style: italic; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; flex: 1; min-width: 0; padding-right: 4px;">"${matchingStatus.note}"</span>
-                    ${trackActionBadge}
-                `;
-
-                const chatInfoZone = card.querySelector(".chat-info");
-                if (chatInfoZone) chatInfoZone.appendChild(noteRowElement);
-            }
-        });
-    });
-}
         listenForIncomingCalls(); 
         loadIndicNetworkStories();
         listenForNetworkStatusNotes();
     });
 }
 
-// ================= FIXED DIRECTORY MANAGER WITH TIMESTAMP LIVENESS CHECK =================
+// =========================================================================
+// 💎 FIXED DIRECTORY MANAGER WITH TIMESTAMP LIVENESS CHECK
+// =========================================================================
 function loadUsers() {
     db.ref("users").on("value", snap => {
         const list = document.getElementById("chatList");
+        if (!list) return;
         list.innerHTML = "";
 
         // Get the current local system epoch timestamp
@@ -230,6 +121,9 @@ function loadUsers() {
                 </div>
             `;
         });
+        
+        // Re-trigger notes append to inject custom badges on newly built UI cards
+        triggerSyncNotesOnDirectory();
     });
 }
 
@@ -237,7 +131,9 @@ function chatId(a, b) {
     return [a, b].sort().join("_");
 }
 
-// ================= HEARTBEAT NODE PRESENCE LAYER =================
+// =========================================================================
+// 💎 HEARTBEAT NODE PRESENCE LAYER
+// =========================================================================
 function startPresence() {
     const myPresenceRef = db.ref("users/" + me);
     
@@ -256,8 +152,8 @@ function startPresence() {
     }, 6000);
 }
 
-  //-----LOGOUT FUNCTION-------//
-  function logout() {
+// ----- LOGOUT FUNCTION ----- //
+function logout() {
     clearInterval(presenceIntervalId);
     if (me) {
         db.ref("users/" + me).update({
@@ -271,7 +167,9 @@ function startPresence() {
     }
 }
 
-// ================= CONVERSATION ENVIRONMENT HOOKS =================
+// =========================================================================
+// 💎 CONVERSATION ENVIRONMENT HOOKS
+// =========================================================================
 function openChat(phone) {
     chatWith = phone;
 
@@ -305,7 +203,9 @@ function goBack() {
     }
 }
 
-// ================= MESSAGING OPTIMIZATION MODULES =================
+// =========================================================================
+// 💎 MESSAGING OPTIMIZATION MODULES
+// =========================================================================
 function sendMessage() {
     const input = document.getElementById("message");
     const text = input.value.trim();
@@ -364,7 +264,8 @@ function loadMessages() {
     });
 }
 
-function renderMessage(m, isMe, key) {
+// RE-ENGINEERED ASYNC MESSAGE bubble TO EMBED INSTANT BACKGROUND TRANSITIONS
+async function renderMessage(m, isMe, key) {
     const box = document.getElementById("chatBox");
     if(document.getElementById(`msg-${key}`)) return; // Prevent layout redundancy leaks
 
@@ -372,7 +273,15 @@ function renderMessage(m, isMe, key) {
     row.id = `msg-${key}`;
     row.className = `msg-row ${isMe ? "sent" : "received"}`;
 
-    // FIXED: Correct parameters passed safely via btoa() into triggerTranscribe
+    // Extract the exact active user dropdown selector choice from the mobile screen configuration layout
+    const mobileSelectedLang = document.getElementById("myDisplayLanguage") ? document.getElementById("myDisplayLanguage").value : "en";
+    let messageBodyText = m.text;
+
+    // PRIVACY/TRANSLATION FILTER NODE: Automatically convert incoming partner chats on-the-fly
+    if (!isMe && mobileSelectedLang !== "en") {
+        messageBodyText = await translateTextForMobile(m.text, mobileSelectedLang);
+    }
+
     let actionPillMarkup = "";
     if (!!isMe === false) { 
         actionPillMarkup = `
@@ -385,7 +294,10 @@ function renderMessage(m, isMe, key) {
 
     row.innerHTML = `
         <div class="msg-bubble">
-            <div class="msg-text-payload" id="text-${key}">${escapeHTML(m.text)}</div>
+            <div class="msg-text-payload" id="text-${key}">
+                ${escapeHTML(messageBodyText)}
+                ${!isMe && mobileSelectedLang !== "en" ? `<br><small style="color:var(--accent-blue, #53bdeb); font-size:0.65rem; opacity:0.8; font-weight:500;">✨ Auto-Translated</small>` : ''}
+            </div>
             ${actionPillMarkup}
             <div class="msg-meta">
                 ${formatTime(m.time)}
@@ -410,9 +322,10 @@ function markSeen() {
     });
 }
 
-// ================= VERNACULAR ON-DEMAND AI ENGINE PIPELINE =================
+// =========================================================================
+// 💎 VERNACULAR ON-DEMAND AI ENGINE PIPELINE
+// =========================================================================
 
-// UPDATED PIPELINE NODE 1: Directly streams core audio synthesis engine patterns
 async function triggerTranscribe(messageKey, encryptedPayload) {
     const originalText = atob(encryptedPayload);
     const selectedLanguage = document.getElementById("myDisplayLanguage") ? document.getElementById("myDisplayLanguage").value : "hi";
@@ -446,7 +359,6 @@ async function triggerTranscribe(messageKey, encryptedPayload) {
     }
 }
 
-// PIPELINE NODE 2: Handles Selective Text Translation via Sarvam APIs
 async function triggerTranslation(messageKey, encryptedPayload) {
     const originalText = atob(encryptedPayload);
     const targetDisplayZone = document.getElementById(`text-${messageKey}`);
@@ -473,7 +385,9 @@ async function triggerTranslation(messageKey, encryptedPayload) {
     }
 }
 
-// ================= TYPING EVENT ENGINE =================
+// =========================================================================
+// 💎 TYPING EVENT ENGINE
+// =========================================================================
 function setTyping(state) {
     if (!me || !chatWith) return;
     db.ref("typing/" + me).set({
@@ -504,7 +418,9 @@ function listenTyping() {
     });
 }
 
-// ================= WEBRTC AV SIGNALING LAYER (REPAIRED & COMPLETE) =================
+// =========================================================================
+// 💎 WEBRTC AV SIGNALING LAYER
+// =========================================================================
 function startCall() { startRealtimeCall(false); }
 function startVideoCall() { startRealtimeCall(true); }
 
@@ -558,7 +474,6 @@ async function startRealtimeCall(video = false) {
 }
 
 function listenForIncomingCalls() {
-    // Clear any loose background call hooks to prevent duplicates
     db.ref("calls").off("child_added");
     
     db.ref("calls").on("child_added", async snap => {
@@ -674,7 +589,6 @@ function processBufferedRemoteCandidates() {
 
 function endCall() {
     if (currentCallId) {
-        // Drop the references from the real-time node cleanly
         db.ref(`calls/${currentCallId}/offerCandidates`).off();
         db.ref(`calls/${currentCallId}/answerCandidates`).off();
         db.ref(`calls/${currentCallId}/answer`).off();
@@ -726,14 +640,285 @@ function handleVideoToggle() {
     updateBtnUI("videoBtn", videoEnabled, videoEnabled ? '<i class="fa-solid fa-video"></i>' : '<i class="fa-solid fa-video-slash"></i>');
 }
 
-// ================= FIXED: MISSING UI FRAMEWORK UTILITIES =================
+// =========================================================================
+// 💎 INSTAGRAM STATUS NOTES & LIVE SPOTIFY LINK CORE LOGIC PLATFORM
+// =========================================================================
+
+function toggleStatusNotePopup() {
+    const popup = document.getElementById("statusNoteConfigPopup");
+    if (!popup) return;
+    
+    const isHidden = popup.style.display === "none" || popup.style.display === "";
+    popup.style.display = isHidden ? "flex" : "none";
+    
+    if (isHidden) {
+        document.getElementById("statusNoteInput").focus();
+    }
+}
+
+function publishProfileStatusNote() {
+    const noteText = document.getElementById("statusNoteInput").value.trim();
+    const rawSpotifyUrl = document.getElementById("statusSpotifyInput").value.trim();
+
+    if (!noteText) {
+        alert("Please enter what is on your mind before sharing!");
+        return;
+    }
+
+    let trackId = "";
+    if (rawSpotifyUrl.includes("track/")) {
+        const matches = rawSpotifyUrl.match(/track\/([a-zA-Z0-9]+)/);
+        if (matches && matches[1]) trackId = matches[1];
+    } else if (rawSpotifyUrl.length > 5) {
+        trackId = rawSpotifyUrl;
+    }
+
+    const notePayload = {
+        note: noteText,
+        spotifyTrackId: trackId,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+    };
+
+    db.ref(`statusNotes/${me}`).set(notePayload).then(() => {
+        document.getElementById("statusNoteInput").value = "";
+        document.getElementById("statusSpotifyInput").value = "";
+        toggleStatusNotePopup();
+    }).catch(err => console.error("Realtime Node status entry lock failure:", err));
+}
+
+function listenForNetworkStatusNotes() {
+    if (!me) return;
+
+    // Personal display monitoring
+    db.ref(`statusNotes/${me}`).on("value", snap => {
+        const data = snap.val();
+        const floatingBubble = document.getElementById("myFloatingBubbleNote");
+        const trackDisplay = document.getElementById("myProfileTrackText");
+
+        if (data) {
+            if (floatingBubble) {
+                floatingBubble.innerText = data.note;
+                floatingBubble.style.display = "block";
+            }
+            if (trackDisplay) {
+                trackDisplay.innerHTML = data.spotifyTrackId 
+                    ? `<a href="https://open.spotify.com/track/${data.spotifyTrackId}" target="_blank" style="color:#1ed760; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><i class="fa-brands fa-spotify"></i> Live Track Linked</a>`
+                    : `<span style="color:rgba(255,255,255,0.4);"><i class="fa-regular fa-comment-dots"></i> ${data.note}</span>`;
+            }
+        }
+    });
+
+    // Network wide directory watcher activation
+    db.ref("statusNotes").on("value", snap => {
+        triggerSyncNotesOnDirectory();
+    });
+}
+
+function triggerSyncNotesOnDirectory() {
+    db.ref("statusNotes").once("value", snap => {
+        const globalNotesMatrix = snap.val() || {};
+        const targetContactCards = document.querySelectorAll(".chat-item");
+        
+        targetContactCards.forEach(card => {
+            const nameField = card.querySelector(".chat-name");
+            if (!nameField) return;
+            
+            const cardUserPhone = nameField.innerText.trim();
+            const matchingStatus = globalNotesMatrix[cardUserPhone];
+
+            const oldNoteRow = card.querySelector(".contact-insta-note-row");
+            if (oldNoteRow) oldNoteRow.remove();
+
+            if (matchingStatus) {
+                const noteRowElement = document.createElement("div");
+                noteRowElement.className = "contact-insta-note-row";
+                noteRowElement.style.cssText = "font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-top: 6px; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); min-width: 0; width: 100%; box-sizing: border-box;";
+
+                let trackActionBadge = "";
+                if (matchingStatus.spotifyTrackId) {
+                    trackActionBadge = `
+                        <a href="https://open.spotify.com/track/${matchingStatus.spotifyTrackId}" target="_blank" onclick="event.stopPropagation();" style="color: #1ed760; background: rgba(30,215,96,0.1); padding: 2px 6px; border-radius: 10px; font-size: 0.62rem; text-decoration: none; display: flex; align-items: center; gap: 3px; font-weight: 600; flex-shrink: 0; margin-left: 6px;">
+                            <i class="fa-brands fa-spotify"></i> Song
+                        </a>`;
+                }
+
+                noteRowElement.innerHTML = `
+                    <span style="font-style: italic; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; flex: 1; min-width: 0; padding-right: 4px;">"${matchingStatus.note}"</span>
+                    ${trackActionBadge}
+                `;
+
+                const chatInfoZone = card.querySelector(".chat-info");
+                if (chatInfoZone) chatInfoZone.appendChild(noteRowElement);
+            }
+        });
+    });
+}
+
+// =========================================================================
+// 💎 REVOLUTION INDIC STATUS STORY TRAIL MATRIX
+// =========================================================================
+
+function uploadStoryStatusMatrix(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const payloadDataString = e.target.result;
+        const targetTimestampEpoch = Date.now();
+
+        db.ref(`stories/${me}`).set({
+            phone: me,
+            mediaData: payloadDataString,
+            timestamp: targetTimestampEpoch
+        }).then(() => {
+            alert("🚀 Status story initialized across the network core matrix!");
+        }).catch(err => {
+            console.error("Payload allocation failure:", err);
+            alert("❌ Storage overflow check file parameters.");
+        });
+    };
+    reader.readAsDataURL(file);
+}
+
+function loadIndicNetworkStories() {
+    db.ref("stories").on("value", snap => {
+        const dynamicStoriesDeck = document.getElementById("dynamicStoriesDeck");
+        if (!dynamicStoriesDeck) return;
+        dynamicStoriesDeck.innerHTML = "";
+
+        const currentEpochTimeNow = Date.now();
+        const absolute24HoursLimitWindow = 24 * 60 * 60 * 1000;
+
+        snap.forEach(child => {
+            const data = child.val();
+            if (!data || !data.phone) return;
+
+            if (currentEpochTimeNow - data.timestamp > absolute24HoursLimitWindow) {
+                child.ref.remove();
+                return;
+            }
+
+            if (data.phone === me) return;
+
+            const shortCasingLabel = data.phone.substring(0,2).toUpperCase();
+            
+            dynamicStoriesDeck.innerHTML += `
+                <div class="story-user-node-wrapper" onclick="launchImmersiveStoryViewer('${btoa(data.phone)}', '${btoa(data.mediaData)}')" style="display: flex; flex-direction: column; align-items: center; cursor: pointer; flex-shrink: 0; width: 68px;">
+                    <div class="live-story-ring" style="width: 58px; height: 58px; border-radius: 50%; padding: 2px; border: 2px solid #53bdeb; display: flex; align-items: center; justify-content: center; background: #121212; transition: transform 0.2s;">
+                        <div style="width: 100%; height: 100%; border-radius: 50%; background: #222; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600;">
+                            ${shortCasingLabel}
+                        </div>
+                    </div>
+                    <span style="font-size: 0.7rem; color: #aaa; max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 6px;">${data.phone}</span>
+                </div>
+            `;
+        });
+    });
+}
+
+function launchImmersiveStoryViewer(encodedPhone, encodedMedia) {
+    const targetPhone = atob(encodedPhone);
+    const targetMedia = atob(encodedMedia);
+
+    const modal = document.getElementById("immersiveStoryViewer");
+    const canvas = document.getElementById("storyViewerMediaCanvas");
+    const bar = document.getElementById("storyProgressBar");
+    const avatar = document.getElementById("storyViewerAvatar");
+    const title = document.getElementById("storyViewerTitle");
+
+    if (!modal || !canvas) return;
+
+    avatar.innerText = targetPhone.substring(0,2).toUpperCase();
+    title.innerText = targetPhone;
+    canvas.src = targetMedia;
+    modal.style.display = "flex";
+
+    setTimeout(() => {
+        bar.style.width = "100%";
+    }, 50);
+
+    window.storyAutoDismissTracker = setTimeout(() => {
+        closeImmersiveStoryViewer();
+    }, 4050);
+}
+
+function closeImmersiveStoryViewer() {
+    const modal = document.getElementById("immersiveStoryViewer");
+    const bar = document.getElementById("storyProgressBar");
+    
+    if (modal) modal.style.display = "none";
+    if (bar) {
+        bar.style.transition = "none";
+        bar.style.width = "0%";
+        setTimeout(() => {
+            bar.style.transition = "width 4s linear";
+        }, 50);
+    }
+    clearTimeout(window.storyAutoDismissTracker);
+}
+
+function openDedicatedStoriesPage() {
+    document.getElementById("chatPage").style.display = "none";
+    const storiesPage = document.getElementById("dedicatedStoriesPage");
+    if (storiesPage) storiesPage.style.display = "block";
+    loadIndicNetworkStories();
+}
+
+function closeDedicatedStoriesPage() {
+    const storiesPage = document.getElementById("dedicatedStoriesPage");
+    if (storiesPage) storiesPage.style.display = "none";
+    document.getElementById("chatPage").style.display = "flex";
+}
+
+// =========================================================================
+// 💎 MOBILE BACKGROUND AUTO-TRANSLATION PIPELINE ENGINE
+// =========================================================================
+
+async function translateTextForMobile(text, targetLang) {
+    if (!text || targetLang === 'en') return text; 
+
+    try {
+        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`)}`);
+        if (!response.ok) return text;
+        
+        const rawData = await response.json();
+        const parsedData = JSON.parse(rawData.contents);
+        
+        let translatedPhrase = "";
+        if (parsedData && parsedData[0]) {
+            parsedData[0].forEach(sentence => {
+                if (sentence[0]) translatedPhrase += sentence[0];
+            });
+        }
+        return translatedPhrase || text;
+    } catch (error) {
+        console.error("Mobile Translation Link Fault:", error);
+        return text; // Safe fallback: keeps original text if data stream drops
+    }
+}
+
+// DROP-DOWN SELECTION WATCHER: Re-triggers and flashes translations when changed
+document.getElementById("myDisplayLanguage").addEventListener("change", () => {
+    if (chatWith) {
+        const box = document.getElementById("chatBox");
+        if (box) box.innerHTML = "";
+        
+        // Re-ignite message streams with the fresh language preference layer
+        loadMessages();
+    }
+});
+
+// =========================================================================
+// 💎 FIXED: UI FRAMEWORK UTILITIES & HELPERS
+// =========================================================================
 function configureCallUIElements(peerPhone, statusText) {
     const callScreen = document.getElementById("callScreen");
-    const callTitle = document.getElementById("callTitle");
+    const callName = document.getElementById("callName");
     const callStatus = document.getElementById("callStatus");
     
     if (callScreen) callScreen.style.display = "flex";
-    if (callTitle) callTitle.innerText = `Peer Connection: ${peerPhone}`;
+    if (callName) callName.innerText = `Peer Connection: ${peerPhone}`;
     if (callStatus) callStatus.innerText = statusText;
 }
 
@@ -746,15 +931,12 @@ function updateBtnUI(btnId, isActive, innerHTMLMarkup) {
         targetBtn.style.background = "rgba(255, 255, 255, 0.15)";
         targetBtn.style.color = "var(--text-main)";
     } else {
-        targetBtn.style.background = "rgba(239, 68, 68, 0.2)"; // Red alert warning background tint
+        targetBtn.style.background = "rgba(239, 68, 68, 0.2)";
         targetBtn.style.color = "#ef4444";
     }
 }
 
-// =========================================================================
-// 🛠️ SYSTEM CORE UTILITIES & HELPERS
-// =========================================================================
-
+// Clean character encoder pipeline protecting layout parsing boundaries
 function escapeHTML(str) {
     if (!str) return "";
     return str
@@ -785,139 +967,3 @@ function onClickInputFocus() {
     }, 250);
 }
 document.getElementById("message").addEventListener("focus", onClickInputFocus);
-
-// ==================== REVOLUTION INDIC INDIC STATUS STORY TRAIL MATRIX ====================
-
-// 1. ENGINE OPERATION: Media Encoding Pipeline Loader
-function uploadStoryStatusMatrix(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const payloadDataString = e.target.result;
-        const targetTimestampEpoch = Date.now();
-
-        // Write the story node straight into your global cluster realtime node setup
-        db.ref(`stories/${me}`).set({
-            phone: me,
-            mediaData: payloadDataString,
-            timestamp: targetTimestampEpoch
-        }).then(() => {
-            alert("🚀 Status story initialized across the network core matrix!");
-        }).catch(err => {
-            console.error("Payload allocation failure:", err);
-            alert("❌ Storage overflow check file parameters.");
-        });
-    };
-    reader.readAsDataURL(file);
-}
-
-// 2. TIMEOUT ENGINE SYNC: Dynamic fetch rendering and 24-hour expiration monitoring loop
-function loadIndicNetworkStories() {
-    db.ref("stories").on("value", snap => {
-        const dynamicStoriesDeck = document.getElementById("dynamicStoriesDeck");
-        if (!dynamicStoriesDeck) return;
-        dynamicStoriesDeck.innerHTML = "";
-
-        const currentEpochTimeNow = Date.now();
-        const absolute24HoursLimitWindow = 24 * 60 * 60 * 1000; // 86400000 milliseconds
-
-        snap.forEach(child => {
-            const data = child.val();
-            if (!data || !data.phone) return;
-
-            // EXPIRED PROTOCOL CORRECTION: Check if file threshold age exceeds 24h limit parameter
-            if (currentEpochTimeNow - data.timestamp > absolute24HoursLimitWindow) {
-                // Auto-purge the dead database document cleanly in the background
-                child.ref.remove();
-                return;
-            }
-
-            // Don't render yourself in the incoming feed track circle deck
-            if (data.phone === me) return;
-
-            // Generate the clean Instagram-style colored circle ring asset node template string
-            const shortCasingLabel = data.phone.substring(0,2).toUpperCase();
-            
-            dynamicStoriesDeck.innerHTML += `
-                <div class="story-user-node-wrapper" onclick="launchImmersiveStoryViewer('${btoa(data.phone)}', '${btoa(data.mediaData)}')" style="display: flex; flex-direction: column; align-items: center; cursor: pointer; flex-shrink: 0; width: 68px;">
-                    <div class="live-story-ring" style="width: 58px; height: 58px; border-radius: 50%; padding: 2px; border: 2px solid #53bdeb; display: flex; align-items: center; justify-content: center; background: #121212; transition: transform 0.2s;">
-                        <div style="width: 100%; height: 100%; border-radius: 50%; background: #222; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600;">
-                            ${shortCasingLabel}
-                        </div>
-                    </div>
-                    <span style="font-size: 0.7rem; color: #aaa; max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 6px;">${data.phone}</span>
-                </div>
-            `;
-        });
-    });
-}
-
-// 3. UI GRAPHIC LAYER INTERACTION: Launches immersive visual modal block execution
-function launchImmersiveStoryViewer(encodedPhone, encodedMedia) {
-    const targetPhone = atob(encodedPhone);
-    const targetMedia = atob(encodedMedia);
-
-    const modal = document.getElementById("immersiveStoryViewer");
-    const canvas = document.getElementById("storyViewerMediaCanvas");
-    const bar = document.getElementById("storyProgressBar");
-    const avatar = document.getElementById("storyViewerAvatar");
-    const title = document.getElementById("storyViewerTitle");
-
-    if (!modal || !canvas) return;
-
-    avatar.innerText = targetPhone.substring(0,2).toUpperCase();
-    title.innerText = targetPhone;
-    canvas.src = targetMedia;
-    modal.style.display = "flex";
-
-    // Initialize progress bar physics animation instantly
-    setTimeout(() => {
-        bar.style.width = "100%";
-    }, 50);
-
-    // Auto dismiss after 4 seconds complete sequence loop run
-    window.storyAutoDismissTracker = setTimeout(() => {
-        closeImmersiveStoryViewer();
-    }, 4050);
-}
-
-function closeImmersiveStoryViewer() {
-    const modal = document.getElementById("immersiveStoryViewer");
-    const bar = document.getElementById("storyProgressBar");
-    
-    if (modal) modal.style.display = "none";
-    if (bar) {
-        bar.style.transition = "none";
-        bar.style.width = "0%";
-        // Restore step transitions loop rules dynamically
-        setTimeout(() => {
-            bar.style.transition = "width 4s linear";
-        }, 50);
-    }
-    clearTimeout(window.storyAutoDismissTracker);
-}
-
-// ==================== STORIES STANDALONE PAGE INTERACTION ENGINE ====================
-
-function openDedicatedStoriesPage() {
-    // Hide the primary core chatting interface container layer completely
-    document.getElementById("chatPage").style.display = "none";
-    
-    // Mount and fade up your expansive new Status Page Screen
-    const storiesPage = document.getElementById("dedicatedStoriesPage");
-    if (storiesPage) storiesPage.style.display = "block";
-    
-    // Explicitly pulse the real-time Firebase reader engine to sync all incoming posts
-    loadIndicNetworkStories();
-}
-
-function closeDedicatedStoriesPage() {
-    // Shut down the standalone stories screen canvas container
-    const storiesPage = document.getElementById("dedicatedStoriesPage");
-    if (storiesPage) storiesPage.style.display = "none";
-    
-    // Restore primary focus visibility straight back onto your main chat control workspace
-    document.getElementById("chatPage").style.display = "flex";
-}
