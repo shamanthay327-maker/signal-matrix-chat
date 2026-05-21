@@ -264,23 +264,13 @@ function loadMessages() {
     });
 }
 
-// RE-ENGINEERED ASYNC MESSAGE bubble TO EMBED INSTANT BACKGROUND TRANSITIONS
-async function renderMessage(m, isMe, key) {
+function renderMessage(m, isMe, key) {
     const box = document.getElementById("chatBox");
     if(document.getElementById(`msg-${key}`)) return; // Prevent layout redundancy leaks
 
     const row = document.createElement("div");
     row.id = `msg-${key}`;
     row.className = `msg-row ${isMe ? "sent" : "received"}`;
-
-    // Extract the exact active user dropdown selector choice from the mobile screen configuration layout
-    const mobileSelectedLang = document.getElementById("myDisplayLanguage") ? document.getElementById("myDisplayLanguage").value : "en";
-    let messageBodyText = m.text;
-
-    // PRIVACY/TRANSLATION FILTER NODE: Automatically convert incoming partner chats on-the-fly
-    if (!isMe && mobileSelectedLang !== "en") {
-        messageBodyText = await translateTextForMobile(m.text, mobileSelectedLang);
-    }
 
     let actionPillMarkup = "";
     if (!!isMe === false) { 
@@ -294,10 +284,7 @@ async function renderMessage(m, isMe, key) {
 
     row.innerHTML = `
         <div class="msg-bubble">
-            <div class="msg-text-payload" id="text-${key}">
-                ${escapeHTML(messageBodyText)}
-                ${!isMe && mobileSelectedLang !== "en" ? `<br><small style="color:var(--accent-blue, #53bdeb); font-size:0.65rem; opacity:0.8; font-weight:500;">✨ Auto-Translated</small>` : ''}
-            </div>
+            <div class="msg-text-payload" id="text-${key}">${escapeHTML(m.text)}</div>
             ${actionPillMarkup}
             <div class="msg-meta">
                 ${formatTime(m.time)}
@@ -323,7 +310,7 @@ function markSeen() {
 }
 
 // =========================================================================
-// 💎 VERNACULAR ON-DEMAND AI ENGINE PIPELINE
+// 💎 VERNACULAR ON-DEMAND AI ENGINE PIPELINE (FIXED FOR MOBILE CLOUD)
 // =========================================================================
 
 async function triggerTranscribe(messageKey, encryptedPayload) {
@@ -359,29 +346,46 @@ async function triggerTranscribe(messageKey, encryptedPayload) {
     }
 }
 
+// 🌐 RE-WIRED MOBILE TRANSLATOR: Now runs 100% on the cloud without localhost backend errors!
 async function triggerTranslation(messageKey, encryptedPayload) {
     const originalText = atob(encryptedPayload);
     const targetDisplayZone = document.getElementById(`text-${messageKey}`);
     const selectedLanguage = document.getElementById("myDisplayLanguage") ? document.getElementById("myDisplayLanguage").value : "hi";
 
-    targetDisplayZone.innerHTML = `<span class="ai-loading">Querying Indic Translation Matrix...</span>`;
-    document.getElementById(`actions-${messageKey}`).style.display = "none";
+    if (!targetDisplayZone) return;
+    targetDisplayZone.innerHTML = `<span class="ai-loading" style="color:var(--accent-blue, #53bdeb); font-size:0.8rem; font-style:italic;">Querying Indic Translation Matrix...</span>`;
+    
+    // Hide buttons during configuration load
+    const actionsBox = document.getElementById(`actions-${messageKey}`);
+    if (actionsBox) actionsBox.style.display = "none";
 
     try {
-        const response = await fetch('http://localhost:5000/api/ai/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: originalText, targetLang: selectedLanguage })
-        });
-        const data = await response.json();
+        // Direct sandboxed query fetch to open internet engine pipeline
+        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${selectedLanguage}&dt=t&q=${encodeURIComponent(originalText)}`)}`);
         
+        if (!response.ok) throw new Error("Cloud network stream fault");
+        
+        const rawData = await response.json();
+        const parsedData = JSON.parse(rawData.contents);
+        
+        let translatedText = "";
+        if (parsedData && parsedData[0]) {
+            parsedData[0].forEach(sentence => {
+                if (sentence[0]) translatedText += sentence[0];
+            });
+        }
+
+        if (!translatedText) translatedText = originalText;
+
         targetDisplayZone.innerHTML = `
-            <span class="translated-label">✨ Translated AI:</span>
-            <div class="translated-body">${escapeHTML(data.translatedText)}</div>
-            <small style="color:var(--text-secondary); opacity:0.5; font-size:0.75rem;">Original: ${escapeHTML(originalText)}</small>
+            <span class="translated-label" style="color:var(--accent-blue, #53bdeb); font-size:0.72rem; font-weight:600; display:block; margin-bottom:2px;">✨ Translated AI:</span>
+            <div class="translated-body" style="color:#fff; font-size:0.9rem;">${escapeHTML(translatedText)}</div>
+            <small style="color:rgba(255,255,255,0.3); font-size:0.7rem; display:block; margin-top:4px;">Original: ${escapeHTML(originalText)}</small>
         `;
     } catch (err) {
-        targetDisplayZone.innerHTML = `${escapeHTML(originalText)} <br><small style="color:red;font-size:0.7rem;">[Local backend connection offline]</small>`;
+        console.error("Translation fail:", err);
+        targetDisplayZone.innerHTML = `${escapeHTML(originalText)} <br><small style="color:#ef4444; font-size:0.7rem;">[Translation pipeline error]</small>`;
+        if (actionsBox) actionsBox.style.display = "flex";
     }
 }
 
@@ -585,59 +589,6 @@ function processBufferedRemoteCandidates() {
             peerConnection.addIceCandidate(new RTCIceCandidate(candidateData)).catch(e => {});
         }
     }
-}
-
-function endCall() {
-    if (currentCallId) {
-        db.ref(`calls/${currentCallId}/offerCandidates`).off();
-        db.ref(`calls/${currentCallId}/answerCandidates`).off();
-        db.ref(`calls/${currentCallId}/answer`).off();
-        db.ref(`calls/${currentCallId}`).off();
-        db.ref("calls/" + currentCallId).remove();
-    }
-    teardownCallState();
-}
-
-function teardownCallState() {
-    const ringer = document.getElementById("ringtone");
-    if (ringer) {
-        ringer.pause();
-        ringer.currentTime = 0;
-    }
-    
-    const callScreen = document.getElementById("callScreen");
-    if (callScreen) callScreen.style.display = "none";
-    
-    remoteIceCandidatesQueue = [];
-    
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-    if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-    }
-    
-    isMuted = false;
-    videoEnabled = true;
-    updateBtnUI("muteBtn", true, '<i class="fa-solid fa-microphone"></i>');
-    updateBtnUI("videoBtn", true, '<i class="fa-solid fa-video"></i>');
-    currentCallId = null;
-}
-
-function handleMuteToggle() {
-    if (!localStream) return;
-    isMuted = !isMuted;
-    localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
-    updateBtnUI("muteBtn", !isMuted, isMuted ? '<i class="fa-solid fa-microphone-slash"></i>' : '<i class="fa-solid fa-microphone"></i>');
-}
-
-function handleVideoToggle() {
-    if (!localStream) return;
-    videoEnabled = !videoEnabled;
-    localStream.getVideoTracks().forEach(t => t.enabled = videoEnabled);
-    updateBtnUI("videoBtn", videoEnabled, videoEnabled ? '<i class="fa-solid fa-video"></i>' : '<i class="fa-solid fa-video-slash"></i>');
 }
 
 // =========================================================================
@@ -858,6 +809,7 @@ function closeImmersiveStoryViewer() {
     clearTimeout(window.storyAutoDismissTracker);
 }
 
+// Controls full-screen page toggles cleanly
 function openDedicatedStoriesPage() {
     document.getElementById("chatPage").style.display = "none";
     const storiesPage = document.getElementById("dedicatedStoriesPage");
@@ -865,49 +817,12 @@ function openDedicatedStoriesPage() {
     loadIndicNetworkStories();
 }
 
+// Shuts down page structures and brings back chat logs area
 function closeDedicatedStoriesPage() {
     const storiesPage = document.getElementById("dedicatedStoriesPage");
     if (storiesPage) storiesPage.style.display = "none";
     document.getElementById("chatPage").style.display = "flex";
 }
-
-// =========================================================================
-// 💎 MOBILE BACKGROUND AUTO-TRANSLATION PIPELINE ENGINE
-// =========================================================================
-
-async function translateTextForMobile(text, targetLang) {
-    if (!text || targetLang === 'en') return text; 
-
-    try {
-        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`)}`);
-        if (!response.ok) return text;
-        
-        const rawData = await response.json();
-        const parsedData = JSON.parse(rawData.contents);
-        
-        let translatedPhrase = "";
-        if (parsedData && parsedData[0]) {
-            parsedData[0].forEach(sentence => {
-                if (sentence[0]) translatedPhrase += sentence[0];
-            });
-        }
-        return translatedPhrase || text;
-    } catch (error) {
-        console.error("Mobile Translation Link Fault:", error);
-        return text; // Safe fallback: keeps original text if data stream drops
-    }
-}
-
-// DROP-DOWN SELECTION WATCHER: Re-triggers and flashes translations when changed
-document.getElementById("myDisplayLanguage").addEventListener("change", () => {
-    if (chatWith) {
-        const box = document.getElementById("chatBox");
-        if (box) box.innerHTML = "";
-        
-        // Re-ignite message streams with the fresh language preference layer
-        loadMessages();
-    }
-});
 
 // =========================================================================
 // 💎 FIXED: UI FRAMEWORK UTILITIES & HELPERS
@@ -936,15 +851,14 @@ function updateBtnUI(btnId, isActive, innerHTMLMarkup) {
     }
 }
 
-// Clean character encoder pipeline protecting layout parsing boundaries
 function escapeHTML(str) {
     if (!str) return "";
     return str
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
+        .replace(/&/g, "&")
+        .replace(/</g, "<")
+        .replace(/>/g, ">")
         .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        .replace(/'/g, "&#39;");
 }
 
 function formatTime(ts) {
