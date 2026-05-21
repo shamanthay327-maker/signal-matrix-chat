@@ -10,6 +10,47 @@
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        .story-drawer {
+            position: fixed; top: 0; left: -340px; width: 320px; height: 100vh;
+            background: #121214; border-right: 1px solid rgba(255,255,255,0.08);
+            z-index: 9000; transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; color: #fff;
+        }
+        .story-drawer.open { left: 0; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .drawer-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.5); z-index: 8500; display: none; backdrop-filter: blur(4px);
+        }
+        .stories-vertical-deck {
+            flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+            padding-right: 4px; margin-top: 15px; scrollbar-width: none;
+        }
+        .stories-vertical-deck::-webkit-scrollbar { display: none; }
+        .upload-trigger-btn {
+            width: 44px; height: 44px; border-radius: 50%; background: #a855f7; color: #fff;
+            border: none; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 1.2rem; transition: transform 0.4s ease, background 0.2s; outline: none;
+        }
+        .upload-trigger-btn.rotate { transform: rotate(405deg); background: #ef4444; }
+        .dropdown-menu-tray {
+            position: absolute; top: 55px; right: 0; background: #1c1c1e;
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 6px;
+            display: none; flex-direction: column; width: 130px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 10000;
+        }
+        .dropdown-menu-tray button {
+            background: transparent; border: none; color: #eee; padding: 8px 12px;
+            text-align: left; font-size: 0.85rem; cursor: pointer; border-radius: 6px; display: flex; align-items: center; gap: 10px; width: 100%;
+        }
+        .dropdown-menu-tray button:hover { background: rgba(255,255,255,0.08); color: #fff; }
+        .reel-nav-btn {
+            width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12); color: #ff007f; display: flex;
+            align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; transition: all 0.2s; outline: none;
+        }
+        .reel-nav-btn:hover { background: rgba(255,255,255,0.15); transform: scale(1.05); }
+    </style>
 </head>
 <body>
 
@@ -36,7 +77,6 @@
                 <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
                     <div style="position: relative; display: inline-block; flex-shrink: 0; cursor: pointer;" onclick="toggleStatusNotePopup()">
                         <div class="avatar-placeholder" id="myAvatar" style="width: 42px; height: 42px; border-radius: 50%; background: var(--accent-blue, #53bdeb); color: #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.95rem; border: 2px solid rgba(255,255,255,0.05);">U</div>
-                        
                         <div id="myFloatingBubbleNote" style="display: none; position: absolute; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); top: -20px; left: 24px; background: #fff; color: #111; padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: 700; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 50;"></div>
                     </div>
 
@@ -49,40 +89,30 @@
                 </div>
 
                 <div class="system-profile-actions-rail" style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-                    
-                    <button onclick="toggleStatusNotePopup()" 
-                            title="Update Music Note Status"
-                            style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #1ed760; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; outline: none;">
+                    <button onclick="toggleStatusNotePopup()" title="Update Music Note Status" style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #1ed760; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
                         <i class="fa-solid fa-music" style="font-size: 0.8rem;"></i>
                     </button>
 
-                    <button onclick="openDedicatedStoriesPage()" 
-                            title="Open Status Feed Space"
-                            style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #a855f7; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; outline: none; position: relative;">
+                    <button onclick="toggleStoriesDrawer(true)" title="Open Status Feed Space" style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #a855f7; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none; position: relative;">
                         <i class="fa-solid fa-circle-nodes" style="font-size: 0.8rem;"></i>
                         <span style="position: absolute; top: 1px; right: 1px; width: 6px; height: 6px; background: #22c55e; border-radius: 50%;"></span>
                     </button>
 
-                    <button onclick="logout()" 
-                            title="Disconnect session" 
-                            style="width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; color: rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: color 0.2s;">
+                    <button onclick="logout()" title="Disconnect session" style="width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; color: rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer;">
                         <i class="fa-solid fa-right-from-bracket" style="font-size: 0.85rem;"></i>
                     </button>
                 </div>
 
                 <div id="statusNoteConfigPopup" style="display: none; position: absolute; top: 60px; left: 12px; width: calc(100% - 24px); max-width: 280px; background: #1c1c1e; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; box-shadow: 0 12px 32px rgba(0,0,0,0.6); z-index: 1000; flex-direction: column; gap: 10px;">
                     <h5 style="margin: 0; font-size: 0.85rem; color: #fff; font-weight: 600;">Set Status Note & Song</h5>
-                    
                     <input type="text" id="statusNoteInput" placeholder="What's on your mind?..." maxlength="60" style="width: 100%; background: #2c2c2e; border: 1px solid rgba(255,255,255,0.08); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; outline: none; box-sizing: border-box;">
-                    
                     <div style="position: relative; width: 100%;">
                         <input type="text" id="statusSpotifyInput" placeholder="Paste Spotify Song Link..." style="width: 100%; background: #2c2c2e; border: 1px solid rgba(255,255,255,0.08); color: #fff; padding: 6px 10px 6px 28px; border-radius: 6px; font-size: 0.8rem; outline: none; box-sizing: border-box;">
                         <i class="fa-brands fa-spotify" style="position: absolute; left: 8px; top: 8px; color: #1ed760; font-size: 0.85rem;"></i>
                     </div>
-                    
                     <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
                         <button onclick="toggleStatusNotePopup()" style="background: transparent; border: none; color: rgba(255,255,255,0.4); font-size: 0.75rem; cursor: pointer; padding: 4px 8px;">Cancel</button>
-                        <button onclick="publishProfileStatusNote()" style="background: #1ed760; border: none; color: #000; font-weight: bold; font-size: 0.75rem; cursor: pointer; padding: 5px 12px; border-radius: 6px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">Share</button>
+                        <button onclick="publishProfileStatusNote()" style="background: #1ed760; border: none; color: #000; font-weight: bold; font-size: 0.75rem; cursor: pointer; padding: 5px 12px; border-radius: 6px;">Share</button>
                     </div>
                 </div>
 
@@ -90,7 +120,29 @@
             <div class="chat-list" id="chatList"></div>
         </aside>
 
-        <main class="main-chat" id="chatWindowContainer">
+        <main class="main-chat" id="chatWindowContainer" style="position: relative;">
+            
+            <div class="top-right-creation-hub" style="position: absolute; top: 15px; right: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 8000;">
+                
+                <div style="position: relative;">
+                    <button id="masterUploadBtn" class="upload-trigger-btn" onclick="toggleUploadDropdownMenu()" title="Create New Content">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                    
+                    <div id="uploadDropdownMenu" class="dropdown-menu-tray">
+                        <button onclick="triggerStoryUploadProcess()"><i class="fa-solid fa-circle-nodes" style="color:#a855f7;"></i> Add Story</button>
+                        <button onclick="alert('Reel generation initialized...')"><i class="fa-solid fa-clapperboard" style="color:#ff007f;"></i> Add Reel</button>
+                        <button onclick="alert('Post publisher module locked...')"><i class="fa-solid fa-image" style="color:#53bdeb;"></i> Add Post</button>
+                    </div>
+                </div>
+
+                <button id="reelsNavBtn" class="reel-nav-btn" onclick="openDedicatedReelsPage()" title="View Reels Stream">
+                    <i class="fa-solid fa-film"></i>
+                </button>
+            </div>
+
+            <input type="file" id="storyMediaUploader" accept="image/*" onchange="uploadStoryStatusMatrix(event)" style="display: none;">
+
             <div class="no-chat-splash" id="noChatSelected">
                 <i class="fa-solid fa-messages"></i>
                 <h2>Signal Web System</h2>
@@ -116,9 +168,7 @@
                             <option value="ta">Tamil (தமிழ்)</option>
                             <option value="te">Telugu (తెలుగు)</option>
                         </select>
-                        
                         <span class="action-divider">|</span>
-                        
                         <button onclick="startCall()" title="Audio channel link"><i class="fa-solid fa-phone"></i></button>
                         <button onclick="startVideoCall()" title="Video matrix sync"><i class="fa-solid fa-video"></i></button>
                     </div>
@@ -136,63 +186,51 @@
         </main>
     </div>
 
+    <div id="drawerOverlay" class="drawer-overlay" onclick="toggleStoriesDrawer(false)"></div>
+    <div id="storiesSidebarDrawer" class="story-drawer">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:12px;">
+            <h3 style="margin:0; font-size:1.1rem; font-weight:600;"><i class="fa-solid fa-images" style="color:#a855f7; margin-right:6px;"></i> Status Spaces</h3>
+            <button onclick="toggleStoriesDrawer(false)" style="background:none; border:none; color:#aaa; font-size:1.2rem; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="stories-vertical-deck">
+            
+            <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.04); display:flex; align-items:center; gap:14px;">
+                <div style="position: relative; width: 60px; height: 60px; flex-shrink: 0;">
+                    <div id="myStoryProfileDisplayCircle" onclick="triggerStoryUploadProcess()" style="width:100%; height:100%; border-radius:50%; background:#2a2a2d; border:2px solid #a855f7; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:1.1rem; color:#fff; cursor:pointer; overflow:hidden;">
+                        M
+                    </div>
+                    <div onclick="triggerStoryUploadProcess()" style="position:absolute; top:-2px; right:-2px; width:20px; height:20px; border-radius:50%; background:#a855f7; color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.65rem; border:2px solid #121214; font-weight:bold; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.3);">
+                        <i class="fa-solid fa-plus"></i>
+                    </div>
+                </div>
+                <div>
+                    <h5 style="margin:0 0 2px 0; font-size:0.88rem; font-weight:600; color:#fff;">My Status update</h5>
+                    <p style="margin:0; font-size:0.72rem; color:rgba(255,255,255,0.4);">Tap circle context to append file</p>
+                </div>
+            </div>
+
+            <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; color:rgba(255,255,255,0.3); font-weight:700; margin-top:5px; border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:4px;">Recent Feeds Matrix</div>
+
+            <div id="verticalDynamicStoriesDeck" style="display:flex; flex-direction:column; gap:12px;"></div>
+        </div>
+    </div>
+
     <div class="call-screen" id="callScreen">
         <div class="video-container">
             <video id="remoteVideo" autoplay playsinline></video>
             <video id="localVideo" autoplay playsinline muted></video>
         </div>
-
         <div class="call-ui-overlay">
             <div class="call-info-block">
                 <h3 id="callName">Peer Identity</h3>
                 <p id="callStatus">HANDSHAKING SYSTEM LINE...</p>
             </div>
-
             <div class="call-controls">
                 <button class="ctrl-btn" id="muteBtn" onclick="handleMuteToggle()"><i class="fa-solid fa-microphone"></i></button>
                 <button class="ctrl-btn" id="videoBtn" onclick="handleVideoToggle()"><i class="fa-solid fa-video"></i></button>
                 <button class="ctrl-btn hangup" onclick="endCall()"><i class="fa-solid fa-phone-slash"></i></button>
-            </div>
-        </div>
-    </div>
-
-    <div id="dedicatedStoriesPage" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0b0b0c; z-index: 9500; color: #fff; font-family: inherit;">
-        <div style="height: 65px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; padding: 0 24px; justify-content: space-between; background: #111113;">
-            <div style="display: flex; align-items: center; gap: 14px;">
-                <button onclick="closeDedicatedStoriesPage()" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s;"><i class="fa-solid fa-arrow-left"></i></button>
-                <h2 style="margin: 0; font-size: 1.2rem; font-weight: 600; letter-spacing: 0.3px;">Status Space Core</h2>
-            </div>
-            <span style="font-size: 0.8rem; color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);">24-Hour Network Auto-Purge Engaged</span>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 320px 14px 14px 1fr; height: calc(100vh - 65px); padding: 24px; box-sizing: border-box;">
-            <div style="background: #121215; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box;">
-                <div>
-                    <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #fff; font-weight: 600;">My Status Profile</h4>
-                    <p style="margin: 0; font-size: 0.75rem; color: rgba(255,255,255,0.4);">Publish a real-time status matrix slide update</p>
-                </div>
-                <div onclick="document.getElementById('storyMediaUploader').click()" 
-                     style="height: 140px; border: 2px dashed rgba(168,85,247,0.3); background: rgba(168,85,247,0.03); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: all 0.2s;"
-                     onmouseover="this.style.background='rgba(168,85,247,0.06)'; this.style.borderColor='#a855f7';"
-                     onmouseout="this.style.background='rgba(168,85,247,0.03)'; this.style.borderColor='rgba(168,85,247,0.3)';">
-                    <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(168,85,247,0.15); color: #a855f7; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-                    <span style="font-size: 0.8rem; font-weight: 500; color: rgba(255,255,255,0.9);">Upload Image Slide</span>
-                    <input type="file" id="storyMediaUploader" accept="image/*" onchange="uploadStoryStatusMatrix(event)" style="display: none;">
-                </div>
-                <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
-                    <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.3); font-weight: bold; display: block; margin-bottom: 12px;">Active Status Feed Directory</span>
-                    <p style="margin: 0; font-size: 0.8rem; color: rgba(255,255,255,0.5); line-height: 1.4;">Tap any profile circle icon sitting on the right board canvas to watch their full status loop.</p>
-                </div>
-            </div>
-            
-            <div></div><div></div>
-            
-            <div style="background: #121215; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; box-sizing: border-box;">
-                <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 4px 0; font-size: 1.05rem; color: #fff; font-weight: 600;">Active Peer Logs</h4>
-                    <p style="margin: 0; font-size: 0.8rem; color: rgba(255,255,255,0.4);">Recent status tracks broadcasted across town in the last 24 hours</p>
-                </div>
-                <div id="dynamicStoriesDeck" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap: 20px; overflow-y: auto; flex: 1; padding-right: 5px;"></div>
             </div>
         </div>
     </div>
@@ -206,7 +244,16 @@
             <div id="storyViewerAvatar" style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent-blue, #53bdeb); color: #000; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold;"></div>
             <div id="storyViewerTitle" style="color: #fff; font-size: 0.85rem; font-weight: 500;"></div>
         </div>
-        <img id="storyViewerMediaCanvas" src="" style="max-width: 100%; max-height: 85vh; object-fit: contain; border-radius: 8px; user-select: none; -webkit-user-drag: none;">
+        <img id="storyViewerMediaCanvas" src="" style="max-width: 100%; max-height: 85vh; object-fit: contain; border-radius: 8px; user-select: none;">
+    </div>
+
+    <div id="dedicatedReelsPage" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 9600; color: #fff; flex-direction: column; justify-content: center; align-items: center;">
+        <button onclick="closeDedicatedReelsPage()" style="position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-arrow-left"></i> Close Reels Space</button>
+        <div style="text-align: center;">
+            <i class="fa-solid fa-clapperboard" style="font-size: 3.5rem; color: #ff007f; margin-bottom: 15px; display: block;"></i>
+            <h3 style="margin:0 0 6px 0; font-size:1.4rem;">Immersive Reels Arena</h3>
+            <p style="margin:0; color:rgba(255,255,255,0.4); font-size:0.9rem;">Cloud network reel stream setup finalized successfully.</p>
+        </div>
     </div>
 
     <script src="app.js"></script>
