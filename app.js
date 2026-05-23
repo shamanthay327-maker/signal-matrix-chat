@@ -29,6 +29,10 @@ let videoEnabled = true;
 
 let remoteIceCandidatesQueue = [];
 
+// ✨ E2EE LAYER ARCHITECTURAL STATE HOOKS
+let isE2EEMatrixActive = false;
+let cryptographicSecretKey = "SIGNAL_MATRIX_PASSPHRASE_KEY";
+
 const servers = {
     iceServers: [
         { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
@@ -52,8 +56,10 @@ function login() {
     document.getElementById("myPhoneDisplay").innerText = me;
     document.getElementById("myAvatar").innerText = me.substring(0,2).toUpperCase();
     
-    // Update the custom Left Drawer Avatar Circle context placeholder string initially
-    document.getElementById("myStoryProfileDisplayCircle").innerText = me.substring(0,2).toUpperCase();
+    const myDrawerCircle = document.getElementById("myStoryProfileDisplayCircle");
+    if (myDrawerCircle) {
+        myDrawerCircle.innerText = me.substring(0,2).toUpperCase();
+    }
 
     const userRef = db.ref("users/" + me);
     userRef.once("value", snap => {
@@ -75,13 +81,12 @@ function login() {
         loadUsers();
         startPresence();
         listenForIncomingCalls(); 
-        loadIndicNetworkStories();
         listenForNetworkStatusNotes();
     });
 }
 
 // =========================================================================
-// 💎 FIXED DIRECTORY MANAGER WITH TIMESTAMP LIVENESS CHECK
+// 💎 DIRECTORY MANAGER WITH TIMESTAMP LIVENESS CHECK
 // =========================================================================
 function loadUsers() {
     db.ref("users").on("value", snap => {
@@ -131,6 +136,9 @@ function startPresence() {
     }, 6000);
 }
 
+// =========================================================================
+// 💎 CORE WINDOW TERMINATION AND OPEN NAVIGATION HANDLERS
+// =========================================================================
 function logout() {
     clearInterval(presenceIntervalId);
     if (me) {
@@ -140,6 +148,22 @@ function logout() {
 
 function openChat(phone) {
     chatWith = phone;
+    
+    // 🔄 AUTOMATIC MECHANICAL DISMISS: Collapse mobile dropdown and reset icons cleanly during room changes
+    const targetMobileTriggerNode = document.getElementById("headerThreeDotsTrigger");
+    const targetMobileMenuDrawerNode = document.getElementById("headerActionMenuDrawer");
+    if (targetMobileTriggerNode && targetMobileMenuDrawerNode) {
+        targetMobileTriggerNode.classList.remove("rotate-triangle");
+        targetMobileMenuDrawerNode.style.display = "none";
+    }
+
+    // Auto reset secure active status parameters cleanly when hopping profiles
+    document.getElementById("e2eeLockBtn").classList.remove("secure-active");
+    document.getElementById("e2eeStatusDot").style.display = "none";
+    document.getElementById("e2eeActiveLabel").style.display = "none";
+    isE2EEMatrixActive = false;
+    cryptographicSecretKey = "SIGNAL_MATRIX_PASSPHRASE_KEY";
+
     document.getElementById("noChatSelected").style.display = "none";
     const activeFrame = document.getElementById("activeChatFrame");
     activeFrame.removeAttribute("style");
@@ -153,6 +177,14 @@ function openChat(phone) {
 }
 
 function goBack() {
+    // 🔄 AUTOMATIC MECHANICAL DISMISS: Collapse mobile dropdown and reset icons cleanly when closing workspace windows
+    const targetMobileTriggerNode = document.getElementById("headerThreeDotsTrigger");
+    const targetMobileMenuDrawerNode = document.getElementById("headerActionMenuDrawer");
+    if (targetMobileTriggerNode && targetMobileMenuDrawerNode) {
+        targetMobileTriggerNode.classList.remove("rotate-triangle");
+        targetMobileMenuDrawerNode.style.display = "none";
+    }
+
     document.getElementById("chatWindowContainer").classList.remove("active-window");
     const activeFrame = document.getElementById("activeChatFrame");
     activeFrame.style.display = "none";
@@ -166,7 +198,21 @@ function sendMessage() {
     const text = input.value.trim();
     if (!text || !chatWith) return;
     const id = chatId(me, chatWith);
-    db.ref("chats/" + id).push({ sender: me, text: text, time: firebase.database.ServerValue.TIMESTAMP, status: "sent" });
+
+    let payloadMessage = text;
+    // ✨ INTERCEPTOR: Scramble plain text if E2EE cipher tunnel is active open
+    if (isE2EEMatrixActive) {
+        payloadMessage = encryptStringPayloadCore(text, cryptographicSecretKey);
+    }
+
+    db.ref("chats/" + id).push({ 
+        sender: me, 
+        text: payloadMessage, 
+        type: "text", // Explicit design schema configuration tracker parameter flag
+        time: firebase.database.ServerValue.TIMESTAMP, 
+        status: "sent",
+        encrypted: isE2EEMatrixActive
+    });
     input.value = "";
     setTyping(false);
 }
@@ -212,28 +258,55 @@ async function renderMessage(m, isMe, key) {
     row.className = `msg-row ${isMe ? "sent" : "received"}`;
 
     const mobileSelectedLang = document.getElementById("myDisplayLanguage") ? document.getElementById("myDisplayLanguage").value : "en";
-    let messageBodyText = m.text;
+    let messageBodyText = m.text || "";
+    let wasMessageDecryptedSuccess = false;
+    let isInlineMediaContent = m.type === "image";
 
-    if (!isMe && mobileSelectedLang !== "en") {
-        messageBodyText = await translateTextForMobile(m.text, mobileSelectedLang);
+    // ✨ DECRYPTION INTERCEPTOR ENGINE: Only run decoding loop if payload is pure text string blocks
+    if (m.encrypted && !isInlineMediaContent) {
+        messageBodyText = decryptStringPayloadCore(m.text, cryptographicSecretKey);
+        wasMessageDecryptedSuccess = !messageBodyText.includes("Shared Secret Key Misalignment");
+    }
+
+    if (!isMe && mobileSelectedLang !== "en" && !isInlineMediaContent) {
+        messageBodyText = await translateTextForMobile(messageBodyText, mobileSelectedLang);
     }
 
     let actionPillMarkup = "";
-    if (!!isMe === false) { 
+    if (!!isMe === false && !isInlineMediaContent) { 
         actionPillMarkup = `
             <div class="message-actions" id="actions-${key}" style="margin-top: 5px; display: flex; gap: 8px;">
-                <button class="pill-btn transcribe-btn-selector" onclick="triggerTranscribe('${key}', '${btoa(m.text)}')">🗣️ Transcribe</button>
-                <button class="pill-btn" onclick="triggerTranslation('${key}', '${btoa(m.text)}')"><i class="fa-solid fa-wand-magic-sparkles"></i> Translate AI</button>
+                <button class="pill-btn transcribe-btn-selector" onclick="triggerTranscribe('${key}', '${btoa(messageBodyText)}')">🗣️ Transcribe</button>
+                <button class="pill-btn" onclick="triggerTranslation('${key}', '${btoa(messageBodyText)}')"><i class="fa-solid fa-wand-magic-sparkles"></i> Translate AI</button>
+            </div>
+        `;
+    }
+
+    let secureLockMarkupTag = wasMessageDecryptedSuccess 
+        ? `<div class="e2ee-signature-tag"><i class="fa-solid fa-lock" style="font-size:0.55rem; margin-right:3px;"></i>E2EE Decrypted</div>` 
+        : (m.encrypted && !isInlineMediaContent ? `<div class="e2ee-signature-tag" style="color:#ef4444;"><i class="fa-solid fa-lock-open" style="font-size:0.55rem; margin-right:3px;"></i>Encrypted Line Locked</div>` : '');
+
+    // DYNAMIC LAYOUT COMPILED BUBBLE CONTROLLER: Check if it's text or an image string asset
+    let bubbleContentInnerMarkup = "";
+    if (isInlineMediaContent) {
+        bubbleContentInnerMarkup = `
+            <div class="msg-inline-media-container" onclick="launchStandaloneAttachmentZoomView('${btoa(m.text)}')">
+                <img src="${m.text}">
+            </div>
+        `;
+    } else {
+        bubbleContentInnerMarkup = `
+            <div class="msg-text-payload" id="text-${key}">
+                ${escapeHTML(messageBodyText)}
+                ${!isMe && mobileSelectedLang !== "en" ? `<br><small style="color:var(--accent-blue, #53bdeb); font-size:0.65rem; opacity:0.8;">✨ Auto-Translated</small>` : ''}
             </div>
         `;
     }
 
     row.innerHTML = `
         <div class="msg-bubble">
-            <div class="msg-text-payload" id="text-${key}">
-                ${escapeHTML(messageBodyText)}
-                ${!isMe && mobileSelectedLang !== "en" ? `<br><small style="color:var(--accent-blue, #53bdeb); font-size:0.65rem; opacity:0.8;">✨ Auto-Translated</small>` : ''}
-            </div>
+            ${bubbleContentInnerMarkup}
+            ${secureLockMarkupTag}
             ${actionPillMarkup}
             <div class="msg-meta">
                 ${formatTime(m.time)}
@@ -315,56 +388,209 @@ function listenTyping() {
 }
 
 // =========================================================================
-// 💎 WEBRTC AV SIGNALING LAYER
+// 💎 WEBRTC AV SIGNALING LAYER (FIXED HARDWARE TOGGLES)
 // =========================================================================
 function startCall() { startRealtimeCall(false); }
 function startVideoCall() { startRealtimeCall(true); }
+
 async function startRealtimeCall(video = false) {
-    if (!chatWith) return; currentCallId = chatId(me, chatWith); remoteIceCandidatesQueue = []; configureCallUIElements(chatWith, "Connecting Call...");
+    if (!chatWith) return;
+    currentCallId = chatId(me, chatWith);
+    remoteIceCandidatesQueue = [];
+
+    configureCallUIElements(chatWith, "Calling Peer...");
+
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: video });
-        const localVideo = document.getElementById("localVideo"); if (localVideo) localVideo.srcObject = localStream;
-        peerConnection = new RTCPeerConnection(servers); localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-        peerConnection.ontrack = event => { const remoteVideo = document.getElementById("remoteVideo"); if (remoteVideo && remoteVideo.srcObject !== event.streams[0]) { remoteVideo.srcObject = event.streams[0]; document.getElementById("callStatus").innerText = "CONNECTED LINE"; } };
-        peerConnection.onicecandidate = event => { if (event.candidate && currentCallId) { db.ref(`calls/${currentCallId}/offerCandidates`).push(JSON.stringify(event.candidate)); } };
-        const offer = await peerConnection.createOffer(); await peerConnection.setLocalDescription(offer);
-        await db.ref("calls/" + currentCallId).set({ caller: me, receiver: chatWith, offer: JSON.stringify(offer), type: video ? "video" : "audio", timestamp: firebase.database.ServerValue.TIMESTAMP }); listenForAnswer();
-    } catch (err) { endCall(); }
+        document.getElementById("localVideo").srcObject = localStream;
+
+        peerConnection = new RTCPeerConnection(servers);
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        peerConnection.ontrack = event => {
+            const remoteVideo = document.getElementById("remoteVideo");
+            if (remoteVideo.srcObject !== event.streams[0]) {
+                remoteVideo.srcObject = event.streams[0];
+                document.getElementById("callStatus").innerText = "CONNECTED LINE";
+            }
+        };
+
+        peerConnection.onicecandidate = event => {
+            if (event.candidate) {
+                db.ref(`calls/${currentCallId}/offerCandidates`).push(JSON.stringify(event.candidate));
+            }
+        };
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        const callPayload = {
+            caller: me,
+            receiver: chatWith,
+            offer: JSON.stringify(offer),
+            type: video ? "video" : "audio",
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        };
+
+        await db.ref("calls/" + currentCallId).set(callPayload);
+        listenForAnswer();
+    } catch (err) {
+        console.error("AV Initialization Terminal Fault:", err);
+        alert("Media Interface access denied. Check device configuration profiles.");
+        endCall();
+    }
 }
 
 function listenForIncomingCalls() {
-    db.ref("calls").off("child_added");
     db.ref("calls").on("child_added", async snap => {
-        const data = snap.val(); if (!data || data.receiver !== me) return; if (data.timestamp && Date.now() - data.timestamp > 45000) return;
-        currentCallId = snap.key; remoteIceCandidatesQueue = []; const ringer = document.getElementById("ringtone"); try { if (ringer) ringer.play(); } catch(e){}
-        const accept = confirm(`Incoming call request by ${data.caller}. Want to accept?`); if (ringer) { ringer.pause(); ringer.currentTime = 0; }
-        if (!accept) { db.ref("calls/" + currentCallId).remove(); return; }
+        const data = snap.val();
+        if (!data || data.receiver !== me) return;
+        if (data.timestamp && Date.now() - data.timestamp > 45000) return;
+
+        currentCallId = snap.key;
+        remoteIceCandidatesQueue = [];
+        const ringer = document.getElementById("ringtone");
+        
+        try { ringer.play(); } catch(e){}
+
+        const accept = confirm(`Incoming synchronization channel requested by ${data.caller}. Open pipeline?`);
+        ringer.pause();
+        ringer.currentTime = 0;
+
+        if (!accept) {
+            db.ref("calls/" + currentCallId).remove();
+            return;
+        }
+
         configureCallUIElements(data.caller, "STABILIZING CHANNEL...");
+
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: data.type === "video" });
-            const localVideo = document.getElementById("localVideo"); if (localVideo) localVideo.srcObject = localStream;
-            peerConnection = new RTCPeerConnection(servers); localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-            peerConnection.ontrack = event => { const remoteVideo = document.getElementById("remoteVideo"); if (remoteVideo && remoteVideo.srcObject !== event.streams[0]) { remoteVideo.srcObject = event.streams[0]; document.getElementById("callStatus").innerText = "CALL CONNECTED"; } };
-            peerConnection.onicecandidate = event => { if (event.candidate && currentCallId) { db.ref(`calls/${currentCallId}/answerCandidates`).push(JSON.stringify(event.candidate)); } };
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
-            const answer = await peerConnection.createAnswer(); await peerConnection.setLocalDescription(answer);
-            await db.ref(`calls/${currentCallId}`).update({ answer: JSON.stringify(answer) }); processBufferedRemoteCandidates();
-            db.ref(`calls/${currentCallId}/offerCandidates`).on("child_added", s => { if (peerConnection && peerConnection.remoteDescription) { peerConnection.addIceCandidate(new RTCIceCandidate(JSON.parse(s.val()))).catch(e => {}); } else { remoteIceCandidatesQueue.push(JSON.parse(s.val())); } });
-            db.ref(`calls/${currentCallId}`).on("value", s => { if (!s.exists()) teardownCallState(); });
-        } catch (err) { endCall(); }
+            document.getElementById("localVideo").srcObject = localStream;
+
+            peerConnection = new RTCPeerConnection(servers);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.ontrack = event => {
+                const remoteVideo = document.getElementById("remoteVideo");
+                if (remoteVideo.srcObject !== event.streams[0]) {
+                    remoteVideo.srcObject = event.streams[0];
+                    document.getElementById("callStatus").innerText = "CONNECTED LINE";
+                }
+            };
+
+            peerConnection.onicecandidate = event => {
+                if (event.candidate) {
+                    db.ref(`calls/${currentCallId}/answerCandidates`).push(JSON.stringify(event.candidate));
+                }
+            };
+
+            const offer = JSON.parse(data.offer);
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+
+            await db.ref(`calls/${currentCallId}`).update({ answer: JSON.stringify(answer) });
+
+            // Process accumulated connection candidates safely after description processing completes
+            processBufferedRemoteCandidates();
+
+            db.ref(`calls/${currentCallId}/offerCandidates`).on("child_added", s => {
+                const candidateData = JSON.parse(s.val());
+                if (peerConnection && peerConnection.remoteDescription) {
+                    peerConnection.addIceCandidate(new RTCIceCandidate(candidateData)).catch(e => {});
+                } else {
+                    remoteIceCandidatesQueue.push(candidateData);
+                }
+            });
+            
+            db.ref(`calls/${currentCallId}`).on("value", s => {
+                if (!s.exists()) teardownCallState();
+            });
+
+        } catch (err) {
+            console.error("Media Channel Failure:", err);
+            endCall();
+        }
     });
 }
 
 function listenForAnswer() {
-    if (!currentCallId) return;
-    db.ref(`calls/${currentCallId}/answer`).on("value", async snap => { const answer = snap.val(); if (!answer || !peerConnection || peerConnection.signalingState === "stable") return; await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer))); processBufferedRemoteCandidates(); });
-    db.ref(`calls/${currentCallId}/answerCandidates`).on("child_added", snap => { if (peerConnection && peerConnection.remoteDescription) { peerConnection.addIceCandidate(new RTCIceCandidate(JSON.parse(snap.val()))).catch(e => {}); } else { remoteIceCandidatesQueue.push(JSON.parse(snap.val())); } });
-    db.ref(`calls/${currentCallId}`).on("value", s => { if (!s.exists()) teardownCallState(); });
+    db.ref(`calls/${currentCallId}/answer`).on("value", async snap => {
+        const answer = snap.val();
+        if (!answer || !peerConnection) return;
+        if (peerConnection.signalingState === "stable") return;
+        
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
+        processBufferedRemoteCandidates();
+    });
+
+    db.ref(`calls/${currentCallId}/answerCandidates`).on("child_added", snap => {
+        const candidateData = JSON.parse(snap.val());
+        if (peerConnection && peerConnection.remoteDescription) {
+            peerConnection.addIceCandidate(new RTCIceCandidate(candidateData)).catch(e => {});
+        } else {
+            remoteIceCandidatesQueue.push(candidateData);
+        }
+    });
+
+    db.ref(`calls/${currentCallId}`).on("value", s => {
+        if (!s.exists()) teardownCallState();
+    });
 }
 
-function processBufferedRemoteCandidates() { while (remoteIceCandidatesQueue.length > 0) { const c = remoteIceCandidatesQueue.shift(); if (peerConnection) { peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(e => {}); } } }
-function endCall() { if (currentCallId) { db.ref(`calls/${currentCallId}/offerCandidates`).off(); db.ref(`calls/${currentCallId}/answerCandidates`).off(); db.ref(`calls/${currentCallId}/answer`).off(); db.ref(`calls/${currentCallId}`).off(); db.ref("calls/" + currentCallId).remove(); } teardownCallState(); }
-function teardownCallState() { const ringer = document.getElementById("ringtone"); if (ringer) { ringer.pause(); ringer.currentTime = 0; } const callScreen = document.getElementById("callScreen"); if (callScreen) callScreen.style.display = "none"; remoteIceCandidatesQueue = []; if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; } if (peerConnection) { peerConnection.close(); peerConnection = null; } isMuted = false; videoEnabled = true; updateBtnUI("muteBtn", true, '<i class="fa-solid fa-microphone"></i>'); updateBtnUI("videoBtn", true, '<i class="fa-solid fa-video"></i>'); currentCallId = null; }
+// Flushes the candidate buffer out to clear processing race conditions on smart devices
+function processBufferedRemoteCandidates() {
+    while (remoteIceCandidatesQueue.length > 0) {
+        const candidateData = remoteIceCandidatesQueue.shift();
+        if (peerConnection) {
+            peerConnection.addIceCandidate(new RTCIceCandidate(candidateData)).catch(e => {});
+        }
+    }
+}
+
+function endCall() {
+    if (currentCallId) {
+        db.ref("calls/" + currentCallId).remove();
+    }
+    teardownCallState();
+}
+
+function teardownCallState() {
+    document.getElementById("ringtone").pause();
+    document.getElementById("callScreen").style.display = "none";
+    remoteIceCandidatesQueue = [];
+    
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    
+    isMuted = false;
+    videoEnabled = true;
+    updateBtnUI("muteBtn", true, '<i class="fa-solid fa-microphone"></i>');
+    updateBtnUI("videoBtn", true, '<i class="fa-solid fa-video"></i>');
+}
+
+function handleMuteToggle() {
+    if (!localStream) return;
+    isMuted = !isMuted;
+    localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+    updateBtnUI("muteBtn", !isMuted, isMuted ? '<i class="fa-solid fa-microphone-slash"></i>' : '<i class="fa-solid fa-microphone"></i>');
+}
+
+function handleVideoToggle() {
+    if (!localStream) return;
+    videoEnabled = !videoEnabled;
+    localStream.getVideoTracks().forEach(t => t.enabled = videoEnabled);
+    updateBtnUI("videoBtn", videoEnabled, videoEnabled ? '<i class="fa-solid fa-video"></i>' : '<i class="fa-solid fa-video-slash"></i>');
+}
+
 
 // =========================================================================
 // 💎 INSTAGRAM STATUS NOTES LOGIC PLATFORM
@@ -374,6 +600,20 @@ function publishProfileStatusNote() {
     const noteText = document.getElementById("statusNoteInput").value.trim(); const rawSpotifyUrl = document.getElementById("statusSpotifyInput").value.trim(); if (!noteText) { alert("Please enter what is on your mind before sharing!"); return; }
     let trackId = ""; if (rawSpotifyUrl.includes("track/")) { const matches = rawSpotifyUrl.match(/track\/([a-zA-Z0-9]+)/); if (matches && matches[1]) trackId = matches[1]; } else if (rawSpotifyUrl.length > 5) { trackId = rawSpotifyUrl; }
     db.ref(`statusNotes/${me}`).set({ note: noteText, spotifyTrackId: trackId, timestamp: firebase.database.ServerValue.TIMESTAMP }).then(() => { document.getElementById("statusNoteInput").value = ""; document.getElementById("statusSpotifyInput").value = ""; toggleStatusNotePopup(); }).catch(err => {});
+}
+
+function deleteProfileStatusNote() {
+    if (!me) return;
+    if (confirm("Clear your current status note and music track?")) {
+        db.ref(`statusNotes/${me}`).remove().then(() => {
+            alert("🧹 Status note erased!");
+            const floatingBubble = document.getElementById("myFloatingBubbleNote");
+            const trackDisplay = document.getElementById("myProfileTrackText");
+            if (floatingBubble) { floatingBubble.innerText = ""; floatingBubble.style.display = "none"; }
+            if (trackDisplay) { trackDisplay.innerHTML = `<i class="fa-solid fa-signal" style="font-size: 0.72rem; color: #22c55e;"></i> System Stream Active`; }
+            toggleStatusNotePopup();
+        }).catch(err => console.error("Purge failure:", err));
+    }
 }
 
 function listenForNetworkStatusNotes() {
@@ -405,35 +645,127 @@ function triggerSyncNotesOnDirectory() {
 }
 
 // =========================================================================
-// 💎 RECONSTRUCTED INSTAGRAM-STYLE LEFT SIDEBAR DRAWER & ANIMATED ACTIONS ENGINE
+// 💎 STANDALONE STORIES ROUTING ENGINE & INTERACTIVE DRAG PHYSICAL CONTROLS
 // =========================================================================
-
-// 1. DRAWER PHYSICS: Controls the structural opening and closing of the Left Stories Slide
-function toggleStoriesDrawer(openState) {
+function launchStandaloneStoriesPage() {
+    const stage = document.getElementById("storiesMainStage");
+    const chatPage = document.getElementById("chatPage");
     const drawer = document.getElementById("storiesSidebarDrawer");
-    const overlay = document.getElementById("drawerOverlay");
     
-    if (!drawer || !overlay) return;
+    if (!stage || !chatPage || !drawer) return;
     
-    if (openState) {
-        drawer.classList.add("open");
-        overlay.style.display = "block";
-        loadIndicNetworkStories(); // Sync data paths instantly on drag pulse
-    } else {
-        drawer.classList.remove("open");
-        overlay.style.display = "none";
+    chatPage.style.display = "none";
+    stage.style.display = "block";
+    drawer.style.left = "-320px"; 
+    
+    const myDisplayCircle = document.getElementById("myStoryProfileDisplayCircle");
+    if (myDisplayCircle && me && !myDisplayCircle.querySelector('img')) {
+        myDisplayCircle.innerText = me.substring(0,2).toUpperCase();
+    }
+
+    initializePhysicalDragEngine(); 
+    loadIndicNetworkStories(); 
+}
+
+function exitStandaloneStoriesPage() {
+    const stage = document.getElementById("storiesMainStage");
+    const chatPage = document.getElementById("chatPage");
+    if (stage && chatPage) {
+        stage.style.display = "none";
+        chatPage.style.display = "flex";
     }
 }
 
-// 2. CREATION HUB CONTROLLERS: Clockwise Rotation Matrix & Popup Tray Toggle
+function initializePhysicalDragEngine() {
+    const drawer = document.getElementById("storiesSidebarDrawer");
+    const handle = document.getElementById("dragHandlePill");
+    const overlay = document.getElementById("drawerOverlay");
+    const actionHub = document.getElementById("drawerActionHub");
+    const arrowIcon = document.getElementById("handleArrowIcon");
+
+    if (!drawer || !handle || !overlay || !actionHub) return;
+
+    let isDraggingActive = false;
+    let baselineStartX = 0;
+    let currentDrawerLeftX = -320; 
+    
+    const maxOpenWidthX = 0;      
+    const maxCloseWidthX = -320;  
+
+    handle.onpointerdown = null;
+    window.onpointermove = null;
+    window.onpointerup = null;
+
+    handle.onpointerdown = function(event) {
+        isDraggingActive = true;
+        baselineStartX = event.clientX - currentDrawerLeftX;
+        drawer.style.transition = "none"; 
+        overlay.style.display = "block";
+        handle.setPointerCapture(event.pointerId);
+    };
+
+    window.onpointermove = function(event) {
+        if (!isDraggingActive) return;
+
+        let computedLeftPosition = event.clientX - baselineStartX;
+        if (computedLeftPosition > maxOpenWidthX) computedLeftPosition = maxOpenWidthX;
+        if (computedLeftPosition < maxCloseWidthX) computedLeftPosition = maxCloseWidthX;
+
+        currentDrawerLeftX = computedLeftPosition;
+        drawer.style.left = `${currentDrawerLeftX}px`;
+
+        const openRatioPercentage = (currentDrawerLeftX + 320) / 320; 
+        overlay.style.opacity = openRatioPercentage;
+
+        if (openRatioPercentage >= 0.85) {
+            actionHub.style.opacity = "1";
+            actionHub.style.pointerEvents = "auto";
+            if (arrowIcon) arrowIcon.style.transform = "rotate(180deg)";
+        } else {
+            actionHub.style.opacity = "0";
+            actionHub.style.pointerEvents = "none";
+            if (arrowIcon) arrowIcon.style.transform = "rotate(0deg)";
+        }
+    };
+
+    window.onpointerup = function(event) {
+        if (!isDraggingActive) return;
+        isDraggingActive = false;
+        
+        drawer.style.transition = "left 0.2s cubic-bezier(0.4, 0, 0.2, 1)"; 
+
+        if (currentDrawerLeftX > -160) {
+            currentDrawerLeftX = maxOpenWidthX;
+            drawer.style.left = `${maxOpenWidthX}px`;
+            overlay.style.opacity = "1";
+            actionHub.style.opacity = "1";
+            actionHub.style.pointerEvents = "auto";
+            if (arrowIcon) arrowIcon.style.transform = "rotate(180deg)";
+        } else {
+            currentDrawerLeftX = maxCloseWidthX;
+            drawer.style.left = `${maxCloseWidthX}px`;
+            overlay.style.opacity = "0";
+            overlay.style.display = "none";
+            actionHub.style.opacity = "0";
+            actionHub.style.pointerEvents = "none";
+            if (arrowIcon) arrowIcon.style.transform = "rotate(0deg)";
+            
+            const uploadBtn = document.getElementById("masterUploadBtn");
+            const dropdownMenu = document.getElementById("uploadDropdownMenu");
+            if (uploadBtn && dropdownMenu) {
+                uploadBtn.classList.remove("rotate");
+                dropdownMenu.style.display = "none";
+            }
+        }
+    };
+}
+
 function toggleUploadDropdownMenu() {
     const btn = document.getElementById("masterUploadBtn");
     const menu = document.getElementById("uploadDropdownMenu");
-    
     if (!btn || !menu) return;
     
     const isOpen = btn.classList.contains("rotate");
-    
     if (isOpen) {
         btn.classList.remove("rotate");
         menu.style.display = "none";
@@ -443,32 +775,82 @@ function toggleUploadDropdownMenu() {
     }
 }
 
-// Simple trigger redirect helper to fire file selection layers safely
 function triggerStoryUploadProcess() {
-    toggleUploadDropdownMenu(); // Smooth reset menu rotations close
+    const btn = document.getElementById("masterUploadBtn");
+    const menu = document.getElementById("uploadDropdownMenu");
+    if (btn && menu) {
+        btn.classList.remove("rotate");
+        menu.style.display = "none";
+    }
     document.getElementById("storyMediaUploader").click();
 }
 
-// 3. CORE STORIES ENGINE: Commits media data strings and dynamically replaces circles with Profile Images
 function uploadStoryStatusMatrix(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = function(e) {
-        const payloadDataString = e.target.result;
+        const originalImageInstance = new Image();
+        originalImageInstance.src = e.target.result;
+        
+        originalImageInstance.onload = function() {
+            const maximumTargetWidth = 800;
+            let finalWidth = originalImageInstance.width;
+            let finalHeight = originalImageInstance.height;
 
-        db.ref(`stories/${me}`).set({
-            phone: me,
-            mediaData: payloadDataString,
-            timestamp: Date.now()
-        }).then(() => {
-            alert("🚀 Status story uploaded to the network framework core!");
-            // Smoothly auto open drawer to display the fresh post asset circle layout instantly
-            toggleStoriesDrawer(true);
-        }).catch(err => console.error("Database status commit leak:", err));
+            if (finalWidth > maximumTargetWidth) {
+                finalHeight = Math.round((maximumTargetWidth / finalWidth) * finalHeight);
+                finalWidth = maximumTargetWidth;
+            }
+
+            const processingCanvas = document.createElement("canvas");
+            processingCanvas.width = finalWidth;
+            processingCanvas.height = finalHeight;
+
+            const canvasContext = processingCanvas.getContext("2d");
+            canvasContext.drawImage(originalImageInstance, 0, 0, finalWidth, finalHeight);
+
+            const compressedLightweightString = processingCanvas.toDataURL("image/jpeg", 0.4);
+
+            db.ref(`stories/${me}`).set({
+                phone: me,
+                mediaData: compressedLightweightString,
+                timestamp: Date.now()
+            }).then(() => {
+                alert("🚀 Compressed story active across the network matrix!");
+                
+                const drawer = document.getElementById("storiesSidebarDrawer");
+                const overlay = document.getElementById("drawerOverlay");
+                const actionHub = document.getElementById("drawerActionHub");
+                const arrowIcon = document.getElementById("handleArrowIcon");
+                
+                if (drawer) {
+                    drawer.style.transition = "left 0.2s ease";
+                    drawer.style.left = "0px";
+                    if (overlay) { overlay.style.display = "block"; overlay.style.opacity = "1"; }
+                    if (actionHub) { actionHub.style.opacity = "1"; actionHub.style.pointerEvents = "auto"; }
+                    if (arrowIcon) arrowIcon.style.transform = "rotate(180deg)";
+                }
+            }).catch(err => console.error("Database tracking fault:", err));
+        };
     };
     reader.readAsDataURL(file);
+}
+
+function deleteMyActiveStoryContent() {
+    if (!me) return;
+    toggleUploadDropdownMenu(); 
+    if (confirm("Do you want to delete your active story/post/reel?")) {
+        db.ref(`stories/${me}`).remove().then(() => {
+            alert("🗑️ Story data removed from cloud streams!");
+            const myDisplayCircle = document.getElementById("myStoryProfileDisplayCircle");
+            if (myDisplayCircle) {
+                myDisplayCircle.innerHTML = me.substring(0,2).toUpperCase();
+                myDisplayCircle.onclick = () => triggerStoryUploadProcess();
+            }
+        }).catch(err => console.error("Purge failure:", err));
+    }
 }
 
 function loadIndicNetworkStories() {
@@ -486,24 +868,19 @@ function loadIndicNetworkStories() {
             const data = child.val();
             if (!data || !data.phone) return;
 
-            // 24 Hour Expiration Cleaner
             if (currentEpochNow - data.timestamp > absolute24HoursLimitWindow) {
                 child.ref.remove();
                 return;
             }
 
-            // 👑 THE IDENTITY UPGRADE TRICK: If the story belongs to ME, swap circle contents to my image snapshot!
             if (data.phone === me) {
                 if (myDisplayCircle) {
                     myDisplayCircle.innerHTML = `<img src="${data.mediaData}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
                     myDisplayCircle.onclick = () => launchImmersiveStoryViewer(btoa(me), btoa(data.mediaData));
                 }
-                return; // Pushes my display inside the static top slot card layout node block
+                return; 
             }
 
-            // Render remaining friend cards cascading smoothly downwards vertically
-            const userInitials = data.phone.substring(0,2).toUpperCase();
-            
             verticalDeck.innerHTML += `
                 <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:12px; border:1px solid rgba(255,255,255,0.04); display:flex; align-items:center; gap:14px; cursor:pointer; transition:background 0.2s;" 
                      onclick="launchImmersiveStoryViewer('${btoa(data.phone)}', '${btoa(data.mediaData)}')"
@@ -522,9 +899,8 @@ function loadIndicNetworkStories() {
             `;
         });
 
-        // Safe design fallback fallback state adjustment: restore clean initials if I have no active data node
         if (!snap.hasChild(me) && myDisplayCircle) {
-            myDisplayCircle.innerText = me ? me.substring(0,2).toUpperCase() : "M";
+            myDisplayCircle.innerHTML = me ? me.substring(0,2).toUpperCase() : "U";
             myDisplayCircle.onclick = () => triggerStoryUploadProcess();
         }
     });
@@ -546,19 +922,282 @@ function closeImmersiveStoryViewer() {
     clearTimeout(window.storyAutoDismissTracker);
 }
 
-// 4. STANDALONE REELS AREA WORKSPACE ROUTERS
-function openDedicatedReelsPage() {
-    const reelsPage = document.getElementById("dedicatedReelsPage");
-    if (reelsPage) reelsPage.style.display = "flex";
-}
-
 function closeDedicatedReelsPage() {
     const reelsPage = document.getElementById("dedicatedReelsPage");
     if (reelsPage) reelsPage.style.display = "none";
 }
 
 // =========================================================================
-// 💎 MOBILE BACKGROUND AUTO-TRANSLATION PIPELINE ENGINE
+// 💎 MECHANICAL SETTINGS ROUTING CONTROLLERS
+// =========================================================================
+function launchMechanicalSettingsPage() {
+    const settingsBtn = document.getElementById("sidebarSettingsCog");
+    const settingsStage = document.getElementById("settingsMainStage");
+    const primaryChatPage = document.getElementById("chatPage");
+    const dataBadge = document.getElementById("settingsAccountIDBadge");
+
+    if (!settingsBtn || !settingsStage || !primaryChatPage) return;
+
+    settingsBtn.classList.remove("spin-counter");
+    settingsBtn.classList.add("spin-clockwise");
+
+    if (dataBadge) dataBadge.innerText = me ? me : "Unassigned Guest";
+
+    setTimeout(() => {
+        primaryChatPage.style.display = "none";
+        settingsStage.style.display = "block";
+        const savedTheme = localStorage.getItem("signal_selected_cinematic_theme") || "oled";
+        updateThemeSelectionBordersInSettings(savedTheme);
+    }, 280);
+}
+
+function exitMechanicalSettingsPage() {
+    const settingsBtn = document.getElementById("sidebarSettingsCog");
+    const settingsStage = document.getElementById("settingsMainStage");
+    const primaryChatPage = document.getElementById("chatPage");
+
+    if (!settingsBtn || !settingsStage || !primaryChatPage) return;
+
+    settingsStage.style.display = "none";
+    primaryChatPage.style.display = "flex";
+
+    setTimeout(() => {
+        settingsBtn.classList.remove("spin-clockwise");
+        settingsBtn.classList.add("spin-counter");
+    }, 50);
+}
+
+// =========================================================================
+// 💎 GLOBAL CINEMATIC THEME ENGINE CONFIGURATOR
+// =========================================================================
+function applyGlobalCinematicTheme(themeKey) {
+    const rootElement = document.documentElement;
+    if (!rootElement) return;
+
+    localStorage.setItem("signal_selected_cinematic_theme", themeKey);
+
+    switch (themeKey) {
+        case 'cyberpunk':
+            rootElement.style.setProperty('--accent-blue', '#ff007f'); 
+            rootElement.style.setProperty('--accent-purple', '#a855f7');
+            document.body.style.background = '#0d021a';
+            break;
+        case 'stealth':
+            rootElement.style.setProperty('--accent-blue', '#22c55e'); 
+            rootElement.style.setProperty('--accent-purple', '#84cc16');
+            document.body.style.background = '#151716';
+            break;
+        case 'matrix':
+            rootElement.style.setProperty('--accent-blue', '#00ff00'); 
+            rootElement.style.setProperty('--accent-purple', '#00aa00');
+            document.body.style.background = '#000000';
+            break;
+        case 'oled':
+        default:
+            rootElement.style.setProperty('--accent-blue', '#53bdeb'); 
+            rootElement.style.setProperty('--accent-purple', '#a855f7'); 
+            document.body.style.background = '#09090b';
+            break;
+    }
+    updateThemeSelectionBordersInSettings(themeKey);
+}
+
+function updateThemeSelectionBordersInSettings(activeTheme) {
+    const stage = document.getElementById("settingsMainStage");
+    if (!stage) return;
+    const themeButtons = stage.querySelectorAll("button[onclick^='applyGlobalCinematicTheme']");
+    themeButtons.forEach(btn => {
+        if (btn.getAttribute("onclick").includes(`'${activeTheme}'`)) {
+            btn.style.borderColor = 'var(--accent-blue)';
+            btn.style.boxShadow = '0 0 10px rgba(255,255,255,0.02)';
+        } else {
+            btn.style.borderColor = 'rgba(255,255,255,0.05)';
+            btn.style.boxShadow = 'none';
+        }
+    });
+}
+
+// Auto load cached theme setup metrics natively on browser compilation
+document.addEventListener("DOMContentLoaded", () => {
+    const savedCachedThemeSetting = localStorage.getItem("signal_selected_cinematic_theme");
+    if (savedCachedThemeSetting) {
+        setTimeout(() => { applyGlobalCinematicTheme(savedCachedThemeSetting); }, 300);
+    }
+});
+
+// =========================================================================
+// 💎 CLIENT-SIDE END-TO-END ENCRYPTION (E2EE) CRYPTOGRAPHIC PROTOCOLS
+// =========================================================================
+function toggleEndToEndEncryptionMatrix() {
+    if (!chatWith) {
+        alert("Please tap on an active peer connection before setting up E2EE lines!");
+        return;
+    }
+
+    const lockBtn = document.getElementById("e2eeLockBtn");
+    const statusDot = document.getElementById("e2eeStatusDot");
+    const activeLabel = document.getElementById("e2eeActiveLabel");
+
+    if (!lockBtn) return;
+
+    if (!isE2EEMatrixActive) {
+        let promptKeyInput = prompt("🔑 Initialize Cryptographic E2EE Line:\nEnter a shared Room Security Key cipher value (both you and your peer must type the same key word to decipher messages):", "SignalMatrixKey");
+        
+        if (!promptKeyInput || promptKeyInput.trim() === "") {
+            alert("Security Handshake initialization cancelled. Line remains open.");
+            return;
+        }
+
+        cryptographicSecretKey = promptKeyInput.trim();
+        isE2EEMatrixActive = true;
+
+        lockBtn.classList.add("secure-active");
+        if (statusDot) statusDot.style.display = "block";
+        if (activeLabel) activeLabel.style.display = "inline-block";
+
+        alert("🛡️ Cryptographic E2EE tunnel activated successfully! Outbound chat data will be scrambled prior to transmission.");
+    } else {
+        isE2EEMatrixActive = false;
+        cryptographicSecretKey = "SIGNAL_MATRIX_PASSPHRASE_KEY";
+
+        lockBtn.classList.remove("secure-active");
+        if (statusDot) statusDot.style.display = "none";
+        if (activeLabel) activeLabel.style.display = "none";
+
+        alert("⚠️ End-to-End Encryption disarmed. Communication line is now running over unencrypted base streams.");
+    }
+
+    const box = document.getElementById("chatBox");
+    if (box) box.innerHTML = "";
+    loadMessages();
+}
+
+// 🧮 CORE CRYPTOGRAPHIC BLOCK ENGINES: VIGENÈRE MATRIX TEXT SCRAMBLER
+function encryptStringPayloadCore(plainText, secretKey) {
+    let encryptedResultStr = "";
+    for (let index = 0; index < plainText.length; index++) {
+        let charCodeText = plainText.charCodeAt(index);
+        let charCodeKey = secretKey.charCodeAt(index % secretKey.length);
+        encryptedResultStr += String.fromCharCode((charCodeText + charCodeKey) % 65536);
+    }
+    return btoa(encryptedResultStr); 
+}
+
+function decryptStringPayloadCore(scrambledBase64Text, secretKey) {
+    try {
+        let plainTextDecodedString = atob(scrambledBase64Text);
+        let decryptedResultStr = "";
+        for (let index = 0; index < plainTextDecodedString.length; index++) {
+            let charCodeText = plainTextDecodedString.charCodeAt(index);
+            let charCodeKey = secretKey.charCodeAt(index % secretKey.length);
+            decryptedResultStr += String.fromCharCode((charCodeText - charCodeKey + 65536) % 65536);
+        }
+        return decryptedResultStr;
+    } catch (faultExceptionError) {
+        return "⚠️ [Unreadable Encrypted Payload Block: Shared Secret Key Misalignment]";
+    }
+}
+
+// =========================================================================
+// 📐 CHAT HEADER DRAWER CONTROLLER AND MECHANICAL ROTATORS
+// =========================================================================
+function toggleHeaderActionsDrawerMenu() {
+    const triggerBtn = document.getElementById("headerThreeDotsTrigger");
+    const drawerMenu = document.getElementById("headerActionMenuDrawer");
+    
+    if (!triggerBtn || !drawerMenu) return;
+    
+    const isCurrentlyHidden = drawerMenu.style.display === "none" || drawerMenu.style.display === "";
+    
+    if (isCurrentlyHidden) {
+        drawerMenu.style.display = "flex";
+        triggerBtn.classList.add("rotate-triangle"); // Transforms dots to triangle arrow asset
+    } else {
+        drawerMenu.style.display = "none";
+        triggerBtn.classList.remove("rotate-triangle"); // Rolls back smoothly to original dots style
+    }
+}
+
+// Global window event listener tracking to dismiss drawer instantly if a user clicks inside chat history area
+document.addEventListener("pointerdown", (event) => {
+    const drawerMenu = document.getElementById("headerActionMenuDrawer");
+    const triggerBtn = document.getElementById("headerThreeDotsTrigger");
+    if (!drawerMenu || !triggerBtn) return;
+    
+    if (!drawerMenu.contains(event.target) && !triggerBtn.contains(event.target)) {
+        drawerMenu.style.display = "none";
+        triggerBtn.classList.remove("rotate-triangle");
+    }
+});
+
+// =========================================================================
+// 📎 INLINE MULTIMEDIA MESSAGE ATTACHMENTS PIPELINE INTERCEPTORS
+// =========================================================================
+function processInlineChatAttachment(event) {
+    const assetFile = event.target.files[0];
+    if (!assetFile || !chatWith) return;
+
+    const fileFileReader = new FileReader();
+    fileFileReader.onload = function(readerEvent) {
+        const imageHydratorNode = new Image();
+        imageHydratorNode.src = readerEvent.target.result;
+        
+        imageHydratorNode.onload = function() {
+            const maxInlineBoundsWidth = 600;
+            let canvasRenderWidth = imageHydratorNode.width;
+            let canvasRenderHeight = imageHydratorNode.height;
+
+            if (canvasRenderWidth > maxInlineBoundsWidth) {
+                canvasRenderHeight = Math.round((maxInlineBoundsWidth / canvasRenderWidth) * canvasRenderHeight);
+                canvasRenderWidth = maxInlineBoundsWidth;
+            }
+
+            const dynamicHardwareCanvas = document.createElement("canvas");
+            dynamicHardwareCanvas.width = canvasRenderWidth;
+            dynamicHardwareCanvas.height = canvasRenderHeight;
+
+            const processingContext2D = dynamicHardwareCanvas.getContext("2d");
+            processingContext2D.drawImage(imageHydratorNode, 0, 0, canvasRenderWidth, canvasRenderHeight);
+
+            const compressedBase64StringAsset = dynamicHardwareCanvas.toDataURL("image/jpeg", 0.45);
+            const activeRoomIDToken = chatId(me, chatWith);
+
+            db.ref("chats/" + activeRoomIDToken).push({
+                sender: me,
+                text: compressedBase64StringAsset,
+                type: "image", 
+                time: firebase.database.ServerValue.TIMESTAMP,
+                status: "sent"
+            }).then(() => {
+                document.getElementById("chatInlineMediaUploader").value = "";
+            }).catch(faultError => console.error("Media channel stream sync lock error:", faultError));
+        };
+    };
+    fileFileReader.readAsDataURL(assetFile);
+}
+
+function launchStandaloneAttachmentZoomView(encodedBase64ImgPayload) {
+    const targetsDecodedSrcString = atob(encodedBase64ImgPayload);
+    const modalViewerStage = document.getElementById("immersiveStoryViewer");
+    const viewerCanvasImageNode = document.getElementById("storyViewerMediaCanvas");
+    const progressAnimationTrackerBar = document.getElementById("storyProgressBar");
+    const avatarBadgePlaceholder = document.getElementById("storyViewerAvatar");
+    const titleHeaderZoneDisplay = document.getElementById("storyViewerTitle");
+
+    if (!modalViewerStage || !viewerCanvasImageNode) return;
+
+    clearTimeout(window.storyAutoDismissTracker);
+
+    if (avatarBadgePlaceholder) avatarBadgePlaceholder.innerText = "📎";
+    if (titleHeaderZoneDisplay) titleHeaderZoneDisplay.innerText = "System Media Attachment";
+    if (progressAnimationTrackerBar) progressAnimationTrackerBar.style.width = "100%";
+    
+    viewerCanvasImageNode.src = targetsDecodedSrcString;
+    modalViewerStage.style.display = "flex";
+}
+
+// =========================================================================
+// 💎 TRANSLATION AND FRAMEWORK HELPERS
 // =========================================================================
 async function translateTextForMobile(text, targetLang) {
     if (!text || targetLang === 'en') return text; 
@@ -573,12 +1212,11 @@ async function translateTextForMobile(text, targetLang) {
 
 document.getElementById("myDisplayLanguage").addEventListener("change", () => { if (chatWith) { const box = document.getElementById("chatBox"); if (box) box.innerHTML = ""; loadMessages(); } });
 
-// =========================================================================
-// 💎 FIXED: UI FRAMEWORK UTILITIES & HELPERS
-// =========================================================================
-function configureCallUIElements(peerPhone, statusText) { const callScreen = document.getElementById("callScreen"); const callName = document.getElementById("callName"); const callStatus = document.getElementById("callStatus"); if (callScreen) callScreen.style.display = "flex"; if (callName) callName.innerText = `Peer Connection: ${peerPhone}`; if (callStatus) callStatus.innerText = statusText; }
+function configureCallUIElements(peerPhone, statusText) { const callScreen = document.getElementById("callScreen"); const callName = document.getElementById("callName"); const callStatus = document.getElementById("callStatus"); if (callScreen) callScreen.style.display = "flex"; if (callName) callName.innerText = `Peer Connection: ${peerPhone}`; if (callStatus) declineStatusView(statusText); }
+function declineStatusView(text) { const label = document.getElementById("callStatus"); if (label) label.innerText = text; }
 function updateBtnUI(btnId, isActive, innerHTMLMarkup) { const targetBtn = document.getElementById(btnId); if (!targetBtn) return; targetBtn.innerHTML = innerHTMLMarkup; if (isActive) { targetBtn.style.background = "rgba(255, 255, 255, 0.15)"; targetBtn.style.color = "var(--text-main)"; } else { targetBtn.style.background = "rgba(239, 68, 68, 0.2)"; targetBtn.style.color = "#ef4444"; } }
-function escapeHTML(str) { if (!str) return ""; return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+defineEscapeStringMatrix = str => str ? str.replace(/&/g,"&").replace(/</g,"<").replace(/>/g,">").replace(/"/g,"\"").replace(/'/g,"'") : "";
+function escapeHTML(str) { return defineEscapeStringMatrix(str); }
 function formatTime(ts) { if (!ts) return ""; const d = new Date(ts); return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 function getTicks(status) { if (status === "sent") return '<i class="fa-solid fa-check" style="color:var(--text-secondary)"></i>'; if (status === "delivered") return '<i class="fa-solid fa-check-double" style="color:var(--text-secondary)"></i>'; if (status === "seen") return '<i class="fa-solid fa-check-double" style="color: var(--accent-blue)"></i>'; return ""; }
 function onClickInputFocus() { setTimeout(() => { const box = document.getElementById("chatBox"); if (box) box.scrollTop = box.scrollHeight; }, 250); }

@@ -12,44 +12,107 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <style>
-        .story-drawer {
-            position: fixed; top: 0; left: -340px; width: 320px; height: 100vh;
-            background: #121214; border-right: 1px solid rgba(255,255,255,0.08);
-            z-index: 9000; transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; color: #fff;
+        .story-button-pulsate {
+            width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(168,85,247,0.25);
+            background: rgba(168,85,247,0.06); color: #a855f7; display: flex; align-items: center; 
+            justify-content: center; cursor: pointer; transition: all 0.2s ease; outline: none;
         }
-        .story-drawer.open { left: 0; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
-        .drawer-overlay {
+        .story-button-pulsate:hover { background: rgba(168,85,247,0.15); border-color: #a855f7; }
+        
+        /* FULL-SCREEN STANDALONE STAGE VIEW WITH INJECTED OVERFLOW SCROLL ON SETTINGS */
+        .stories-main-stage, .settings-main-stage {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.5); z-index: 8500; display: none; backdrop-filter: blur(4px);
+            background: #09090b; z-index: 8500; display: none; color: #fff;
+            font-family: inherit; overflow: hidden;
+        }
+        
+        /* VERTICAL DECK LAYOUT WRAPPER FOR SETTINGS CARDS */
+        .settings-scroll-deck {
+            height: calc(100vh - 65px);
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+            scrollbar-width: none;
+        }
+        .settings-scroll-deck::-webkit-scrollbar { display: none; }
+
+        /* ROTATABLE MECHANICS STYLES */
+        .settings-gear-btn {
+            background: transparent; border: none; color: rgba(255,255,255,0.4);
+            font-size: 0.85rem; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; width: 22px; height: 22px; transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s;
+            outline: none; position: absolute; top: -14px; left: 10px; z-index: 100;
+        }
+        .settings-gear-btn:hover { color: var(--accent-blue, #53bdeb); }
+        .settings-gear-btn.spin-clockwise { transform: rotate(360deg); color: var(--accent-blue, #53bdeb); }
+        .settings-gear-btn.spin-counter { transform: rotate(0deg); }
+
+        /* INTERACTIVE DRAG DRAWER WITH FIXED BASE POSITION */
+        .story-drawer {
+            position: absolute; top: 0; left: -320px; width: 320px; height: 100vh;
+            background: #111114; border-right: 1px solid rgba(255,255,255,0.06);
+            display: flex; flex-direction: column; padding: 20px; box-sizing: border-box;
+            z-index: 9000; touch-action: none;
+        }
+        
+        .drawer-drag-handle {
+            position: absolute; top: 50%; right: -28px; transform: translateY(-50%);
+            width: 28px; height: 75px; background: #1c1c1e; border: 1px solid rgba(255,255,255,0.08);
+            border-left: none; border-radius: 0 10px 10px 0; display: flex; align-items: center;
+            justify-content: center; color: #a855f7; cursor: grab; z-index: 9100;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.3); transition: background 0.2s;
+        }
+        .drawer-drag-handle:active { cursor: grabbing; background: #222226; }
+        
+        .drawer-overlay {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.6); z-index: 8900; opacity: 0; pointer-events: none;
+            backdrop-filter: blur(4px); transition: opacity 0.2s ease;
         }
         .stories-vertical-deck {
             flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
             padding-right: 4px; margin-top: 15px; scrollbar-width: none;
         }
         .stories-vertical-deck::-webkit-scrollbar { display: none; }
+        
+        .drawer-top-right-creation-hub {
+            position: absolute; top: 15px; right: 15px; display: flex;
+            align-items: center; gap: 8px; z-index: 9500; opacity: 0; 
+            pointer-events: none; transition: opacity 0.2s ease;
+        }
         .upload-trigger-btn {
-            width: 44px; height: 44px; border-radius: 50%; background: #a855f7; color: #fff;
+            width: 34px; height: 34px; border-radius: 50%; background: #a855f7; color: #fff;
             border: none; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 1.2rem; transition: transform 0.4s ease, background 0.2s; outline: none;
+            cursor: pointer; font-size: 0.95rem; transition: transform 0.4s ease, background 0.2s; outline: none;
         }
         .upload-trigger-btn.rotate { transform: rotate(405deg); background: #ef4444; }
+        
         .dropdown-menu-tray {
-            position: absolute; top: 55px; right: 0; background: #1c1c1e;
+            position: absolute; top: 40px; right: 0; background: #1c1c1e;
             border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 6px;
-            display: none; flex-direction: column; width: 130px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 10000;
+            display: none; flex-direction: column; width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 10000;
         }
         .dropdown-menu-tray button {
             background: transparent; border: none; color: #eee; padding: 8px 12px;
             text-align: left; font-size: 0.85rem; cursor: pointer; border-radius: 6px; display: flex; align-items: center; gap: 10px; width: 100%;
         }
         .dropdown-menu-tray button:hover { background: rgba(255,255,255,0.08); color: #fff; }
+        
         .reel-nav-btn {
-            width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.08);
+            width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.08);
             border: 1px solid rgba(255,255,255,0.12); color: #ff007f; display: flex;
-            align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; transition: all 0.2s; outline: none;
+            align-items: center; justify-content: center; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; outline: none;
         }
-        .reel-nav-btn:hover { background: rgba(255,255,255,0.15); transform: scale(1.05); }
+
+        /* PREMIUM ADAPTIVE SETTINGS LAYOUT CARD MODULES */
+        .settings-card-wrapper {
+            background: #121214; border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; width: 100%; box-sizing: border-box;
+        }
+        .settings-toggle-row {
+            display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .settings-toggle-row:last-child { border: none; }
     </style>
 </head>
 <body>
@@ -74,7 +137,12 @@
         <aside class="sidebar">
             <div class="sidebar-header" style="padding: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #111113; display: flex; align-items: center; justify-content: space-between; position: relative;">
                 
-                <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+                <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; position: relative; padding-top: 10px;">
+                    
+                    <button id="sidebarSettingsCog" class="settings-gear-btn" onclick="launchMechanicalSettingsPage()" title="Open Matrix Settings Space">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+
                     <div style="position: relative; display: inline-block; flex-shrink: 0; cursor: pointer;" onclick="toggleStatusNotePopup()">
                         <div class="avatar-placeholder" id="myAvatar" style="width: 42px; height: 42px; border-radius: 50%; background: var(--accent-blue, #53bdeb); color: #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.95rem; border: 2px solid rgba(255,255,255,0.05);">U</div>
                         <div id="myFloatingBubbleNote" style="display: none; position: absolute; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); top: -20px; left: 24px; background: #fff; color: #111; padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: 700; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 50;"></div>
@@ -93,9 +161,8 @@
                         <i class="fa-solid fa-music" style="font-size: 0.8rem;"></i>
                     </button>
 
-                    <button onclick="toggleStoriesDrawer(true)" title="Open Status Feed Space" style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #a855f7; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none; position: relative;">
+                    <button class="story-button-pulsate" onclick="launchStandaloneStoriesPage()" title="Open Dedicated Stories Space">
                         <i class="fa-solid fa-circle-nodes" style="font-size: 0.8rem;"></i>
-                        <span style="position: absolute; top: 1px; right: 1px; width: 6px; height: 6px; background: #22c55e; border-radius: 50%;"></span>
                     </button>
 
                     <button onclick="logout()" title="Disconnect session" style="width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; color: rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer;">
@@ -110,9 +177,12 @@
                         <input type="text" id="statusSpotifyInput" placeholder="Paste Spotify Song Link..." style="width: 100%; background: #2c2c2e; border: 1px solid rgba(255,255,255,0.08); color: #fff; padding: 6px 10px 6px 28px; border-radius: 6px; font-size: 0.8rem; outline: none; box-sizing: border-box;">
                         <i class="fa-brands fa-spotify" style="position: absolute; left: 8px; top: 8px; color: #1ed760; font-size: 0.85rem;"></i>
                     </div>
-                    <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
-                        <button onclick="toggleStatusNotePopup()" style="background: transparent; border: none; color: rgba(255,255,255,0.4); font-size: 0.75rem; cursor: pointer; padding: 4px 8px;">Cancel</button>
-                        <button onclick="publishProfileStatusNote()" style="background: #1ed760; border: none; color: #000; font-weight: bold; font-size: 0.75rem; cursor: pointer; padding: 5px 12px; border-radius: 6px;">Share</button>
+                    <div style="display: flex; gap: 6px; justify-content: space-between; align-items: center; margin-top: 4px; width: 100%;">
+                        <button onclick="deleteProfileStatusNote()" style="background: rgba(239,68,68,0.15); border: none; color: #ef4444; font-weight: 600; font-size: 0.72rem; cursor: pointer; padding: 5px 10px; border-radius: 6px; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-trash-can"></i> Clear</button>
+                        <div style="display: flex; gap: 6px;">
+                            <button onclick="toggleStatusNotePopup()" style="background: transparent; border: none; color: rgba(255,255,255,0.4); font-size: 0.75rem; cursor: pointer; padding: 4px 8px;">Cancel</button>
+                            <button onclick="publishProfileStatusNote()" style="background: #1ed760; border: none; color: #000; font-weight: bold; font-size: 0.75rem; cursor: pointer; padding: 5px 12px; border-radius: 6px;">Share</button>
+                        </div>
                     </div>
                 </div>
 
@@ -121,28 +191,6 @@
         </aside>
 
         <main class="main-chat" id="chatWindowContainer" style="position: relative;">
-            
-            <div class="top-right-creation-hub" style="position: absolute; top: 15px; right: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 8000;">
-                
-                <div style="position: relative;">
-                    <button id="masterUploadBtn" class="upload-trigger-btn" onclick="toggleUploadDropdownMenu()" title="Create New Content">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
-                    
-                    <div id="uploadDropdownMenu" class="dropdown-menu-tray">
-                        <button onclick="triggerStoryUploadProcess()"><i class="fa-solid fa-circle-nodes" style="color:#a855f7;"></i> Add Story</button>
-                        <button onclick="alert('Reel generation initialized...')"><i class="fa-solid fa-clapperboard" style="color:#ff007f;"></i> Add Reel</button>
-                        <button onclick="alert('Post publisher module locked...')"><i class="fa-solid fa-image" style="color:#53bdeb;"></i> Add Post</button>
-                    </div>
-                </div>
-
-                <button id="reelsNavBtn" class="reel-nav-btn" onclick="openDedicatedReelsPage()" title="View Reels Stream">
-                    <i class="fa-solid fa-film"></i>
-                </button>
-            </div>
-
-            <input type="file" id="storyMediaUploader" accept="image/*" onchange="uploadStoryStatusMatrix(event)" style="display: none;">
-
             <div class="no-chat-splash" id="noChatSelected">
                 <i class="fa-solid fa-messages"></i>
                 <h2>Signal Web System</h2>
@@ -160,23 +208,49 @@
                         </div>
                     </div>
                     
-                    <div class="chat-actions">
-                        <select id="myDisplayLanguage" class="lang-dropdown-selector">
-                            <option value="en">English (Default)</option>
-                            <option value="hi">Hindi (हिंदी)</option>
-                            <option value="kn">Kannada (ಕನ್ನಡ)</option>
-                            <option value="ta">Tamil (தமிழ்)</option>
-                            <option value="te">Telugu (తెలుగు)</option>
-                        </select>
-                        <span class="action-divider">|</span>
-                        <button onclick="startCall()" title="Audio channel link"><i class="fa-solid fa-phone"></i></button>
-                        <button onclick="startVideoCall()" title="Video matrix sync"><i class="fa-solid fa-video"></i></button>
+                    <div class="chat-actions" style="position: relative; display: flex; align-items: center; gap: 4px;">
+                        <button onclick="startCall()" title="Audio channel link" style="background: none; border: none; color: var(--text-secondary); font-size: 1.1rem; padding: 10px; cursor: pointer;"><i class="fa-solid fa-phone"></i></button>
+                        <button onclick="startVideoCall()" title="Video matrix sync" style="background: none; border: none; color: var(--text-secondary); font-size: 1.1rem; padding: 10px; cursor: pointer;"><i class="fa-solid fa-video"></i></button>
+                        
+                        <span class="action-divider" style="color: rgba(255,255,255,0.1); margin: 0 4px;">|</span>
+
+                        <button id="headerThreeDotsTrigger" onclick="toggleHeaderActionsDrawerMenu()" title="Open System Parameter Node" style="background: none; border: none; color: var(--text-secondary); font-size: 1.1rem; padding: 10px; cursor: pointer; outline: none; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px;">
+                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                        </button>
+
+                        <div id="headerActionMenuDrawer" style="display: none; position: absolute; top: 48px; right: 0; background: #1c1c1e; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; flex-direction: column; gap: 12px; width: 200px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 10005;">
+                            
+                            <div style="display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                                <span style="font-size: 0.65rem; text-transform: uppercase; color: rgba(255,255,255,0.3); font-weight: 700; letter-spacing: 0.5px;">Security Matrix</span>
+                                <button id="e2eeLockBtn" onclick="toggleEndToEndEncryptionMatrix(); toggleHeaderActionsDrawerMenu();" style="width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); color: #fff; padding: 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; outline: none; position: relative;">
+                                    <i class="fa-solid fa-shield-halved"></i> E2EE Scrambler
+                                    <span id="e2eeStatusDot" style="display: none; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: #33ffd0; border-radius: 50%;"></span>
+                                </button>
+                                <span id="e2eeActiveLabel" style="display: none; font-size: 0.6rem; color: #33ffd0; font-weight: 700; text-align: center; text-transform: uppercase; background: rgba(51,255,208,0.08); padding: 2px; border-radius: 4px; margin-top: 2px;">E2EE Active</span>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <span style="font-size: 0.65rem; text-transform: uppercase; color: rgba(255,255,255,0.3); font-weight: 700; letter-spacing: 0.5px;">Stream Translation</span>
+                                <select id="myDisplayLanguage" class="lang-dropdown-selector" style="width: 100%; background: #2c2c2e; color: #fff; border: 1px solid rgba(255,255,255,0.08); padding: 8px; border-radius: 6px; font-size: 0.78rem; outline: none; cursor: pointer;">
+                                    <option value="en">English (Default)</option>
+                                    <option value="hi">Hindi (हिंदी)</option>
+                                    <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                                    <option value="ta">Tamil (தமிழ்)</option>
+                                    <option value="te">Telugu (ತೆಲುಗು)</option>
+                                </select>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
-
                 <div class="chat-box" id="chatBox"></div>
-
                 <div class="chat-input-bar">
+                    <input type="file" id="chatInlineMediaUploader" accept="image/*" onchange="processInlineChatAttachment(event)" style="display: none;">
+                    
+                    <button onclick="document.getElementById('chatInlineMediaUploader').click()" title="Attach System Asset" style="background: transparent; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; outline: none;" onmouseover="this.style.background='rgba(255,255,255,0.05)'; this.style.color='var(--accent-blue)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+                        <i class="fa-solid fa-paperclip"></i>
+                    </button>
+
                     <div class="chat-input-container">
                         <input type="text" id="message" placeholder="Type a message..." autocomplete="off">
                     </div>
@@ -186,47 +260,155 @@
         </main>
     </div>
 
-    <div id="drawerOverlay" class="drawer-overlay" onclick="toggleStoriesDrawer(false)"></div>
-    <div id="storiesSidebarDrawer" class="story-drawer">
-        
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:12px;">
-            <h3 style="margin:0; font-size:1.1rem; font-weight:600;"><i class="fa-solid fa-images" style="color:#a855f7; margin-right:6px;"></i> Status Spaces</h3>
-            <button onclick="toggleStoriesDrawer(false)" style="background:none; border:none; color:#aaa; font-size:1.2rem; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+    <div id="storiesMainStage" class="stories-main-stage">
+        <div style="height: 65px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; padding: 0 24px; background: #111113; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <button onclick="exitStandaloneStoriesPage()" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 style="margin: 0; font-size: 1.15rem; font-weight: 400;">Posts</h2>
+            </div>
+            <p style="margin:0; font-size:0.8rem; color:rgba(255,255,255,0.4); text-align:right; flex:1; padding-right:100px;">◄ Slide to open story bar</p>
         </div>
 
-        <div class="stories-vertical-deck">
+        <div id="drawerOverlay" class="drawer-overlay"></div>
+
+        <div id="storiesSidebarDrawer" class="story-drawer">
             
-            <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.04); display:flex; align-items:center; gap:14px;">
-                <div style="position: relative; width: 60px; height: 60px; flex-shrink: 0;">
-                    <div id="myStoryProfileDisplayCircle" onclick="triggerStoryUploadProcess()" style="width:100%; height:100%; border-radius:50%; background:#2a2a2d; border:2px solid #a855f7; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:1.1rem; color:#fff; cursor:pointer; overflow:hidden;">
-                        M
+            <div id="dragHandlePill" class="drawer-drag-handle">
+                <i class="fa-solid fa-ellipsis-vertical" style="font-size: 0.8rem; opacity: 0.6; margin-right:2px;"></i>
+                <i class="fa-solid fa-chevron-right" id="handleArrowIcon" style="font-size:0.7rem; transition: transform 0.2s;"></i>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:12px; margin-bottom: 5px;">
+                <h3 style="margin:0; font-size:1.05rem; font-weight:600;"><i class="fa-solid fa-images" style="color:#a855f7; margin-right:6px;"></i> Feed Core</h3>
+            </div>
+
+            <div id="drawerActionHub" class="drawer-top-right-creation-hub">
+                <button id="reelsNavBtn" class="reel-nav-btn" onclick="openDedicatedReelsPage()" title="View Reels Stream"><i class="fa-solid fa-film"></i></button>
+                <div style="position: relative; display: inline-block;">
+                    <button id="masterUploadBtn" class="upload-trigger-btn" onclick="toggleUploadDropdownMenu()" title="Create New Content"><i class="fa-solid fa-plus"></i></button>
+                    <div id="uploadDropdownMenu" class="dropdown-menu-tray" style="top: 40px; right: 0;">
+                        <button onclick="triggerStoryUploadProcess()"><i class="fa-solid fa-circle-nodes" style="color:#a855f7;"></i> Add Story</button>
+                        <button onclick="alert('Reel setup initiated...')"><i class="fa-solid fa-clapperboard" style="color:#ff007f;"></i> Add Reel</button>
+                        <button onclick="alert('Post publisher module locked...')"><i class="fa-solid fa-image" style="color:#53bdeb;"></i> Add Post</button>
+                        <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 4px 0;">
+                        <button onclick="deleteMyActiveStoryContent()" style="color:#ef4444; font-weight: 500;"><i class="fa-solid fa-trash-can"></i> Delete Mine</button>
                     </div>
-                    <div onclick="triggerStoryUploadProcess()" style="position:absolute; top:-2px; right:-2px; width:20px; height:20px; border-radius:50%; background:#a855f7; color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.65rem; border:2px solid #121214; font-weight:bold; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.3);">
-                        <i class="fa-solid fa-plus"></i>
-                    </div>
-                </div>
-                <div>
-                    <h5 style="margin:0 0 2px 0; font-size:0.88rem; font-weight:600; color:#fff;">My Status update</h5>
-                    <p style="margin:0; font-size:0.72rem; color:rgba(255,255,255,0.4);">Tap circle context to append file</p>
                 </div>
             </div>
 
-            <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; color:rgba(255,255,255,0.3); font-weight:700; margin-top:5px; border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:4px;">Recent Feeds Matrix</div>
+            <div class="stories-vertical-deck">
+                <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.04); display:flex; align-items:center; gap:14px;">
+                    <div style="position: relative; width: 60px; height: 60px; flex-shrink: 0;">
+                        <div id="myStoryProfileDisplayCircle" onclick="triggerStoryUploadProcess()" style="width:100%; height:100%; border-radius:50%; background:#2a2a2d; border:2px solid #a855f7; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:1.1rem; color:#fff; cursor:pointer; overflow:hidden;">U</div>
+                        <div onclick="triggerStoryUploadProcess()" style="position:absolute; top:-2px; right:-2px; width:20px; height:20px; border-radius:50%; background:#a855f7; color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.65rem; border:2px solid #121214; font-weight:bold; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.3); z-index:100;">
+                            <i class="fa-solid fa-plus"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h5 style="margin:0 0 2px 0; font-size:0.85rem; font-weight:600; color:#fff;">My Status</h5>
+                        <p style="margin:0; font-size:0.7rem; color:rgba(255,255,255,0.4);">Tap circle to upload</p>
+                    </div>
+                </div>
+                <div style="font-size:0.68rem; text-transform:uppercase; letter-spacing:1px; color:rgba(255,255,255,0.3); font-weight:700; margin-top:5px; border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:4px;">Recent Feeds</div>
+                <div id="verticalDynamicStoriesDeck" style="display:flex; flex-direction:column; gap:12px;"></div>
+            </div>
+        </div>
 
-            <div id="verticalDynamicStoriesDeck" style="display:flex; flex-direction:column; gap:12px;"></div>
+        <input type="file" id="storyMediaUploader" accept="image/*" onchange="uploadStoryStatusMatrix(event)" style="display: none;">
+    </div>
+
+    <div id="settingsMainStage" class="settings-main-stage">
+        
+        <div style="height: 65px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; padding: 0 24px; background: #111113; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <button onclick="exitMechanicalSettingsPage()" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 style="margin: 0; font-size: 1.15rem; font-weight: 600;"><i class="fa-solid fa-sliders" style="color:var(--accent-blue, #53bdeb); margin-right:6px;"></i> System Settings Vault</h2>
+            </div>
+        </div>
+
+        <div class="settings-scroll-deck">
+            <div style="max-width: 600px; margin: 10px auto; display: flex; flex-direction: column; gap: 20px;">
+                
+                <div class="settings-card-wrapper">
+                    <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:var(--accent-blue, #53bdeb); display:flex; align-items:center; gap:8px;"><i class="fa-regular fa-id-card"></i> Cryptographic Node Profile</h4>
+                    <div class="settings-toggle-row">
+                        <span style="font-size:0.85rem; color:#aaa;">Active Identity Link:</span>
+                        <span id="settingsAccountIDBadge" style="font-size:0.85rem; font-weight:600; color:#fff; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">---</span>
+                    </div>
+                    <div class="settings-toggle-row">
+                        <span style="font-size:0.85rem; color:#aaa;">Server Cloud Node:</span>
+                        <span style="font-size:0.82rem; color:#22c55e; font-weight:500;">Firebase RTDB Primary Cluster (Asia-East)</span>
+                    </div>
+                </div>
+
+                <div class="settings-card-wrapper" style="border-color: rgba(83, 189, 235, 0.15);">
+                    <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:var(--accent-blue, #53bdeb); display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-palette"></i> Global Cinematic Theme Engine
+                    </h4>
+                    <p style="margin:0; font-size:0.72rem; color:rgba(255,255,255,0.4);">Live-toggle your cryptographic matrix visual style profile:</p>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 5px;">
+                        <button onclick="applyGlobalCinematicTheme('oled')" style="background: #111113; border: 2px solid var(--accent-blue, #53bdeb); color: #fff; padding: 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <i class="fa-solid fa-moon" style="color: #53bdeb;"></i> OLED Midnight
+                        </button>
+                        <button onclick="applyGlobalCinematicTheme('cyberpunk')" style="background: #1a0b2e; border: 1px solid rgba(255,255,255,0.05); color: #fff; padding: 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <i class="fa-solid fa-bolt" style="color: #ff007f;"></i> Cyberpunk
+                        </button>
+                        <button onclick="applyGlobalCinematicTheme('stealth')" style="background: #1c1f1d; border: 1px solid rgba(255,255,255,0.05); color: #fff; padding: 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <i class="fa-solid fa-jet-fighter" style="color: #22c55e;"></i> Stealth Jet
+                        </button>
+                        <button onclick="applyGlobalCinematicTheme('matrix')" style="background: #000000; border: 1px solid rgba(255,255,255,0.05); color: #fff; padding: 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <i class="fa-solid fa-terminal" style="color: #00ff00;"></i> Digital Matrix
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-card-wrapper">
+                    <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#a855f7; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Interface Layout Preferences</h4>
+                    <div class="settings-toggle-row">
+                        <div style="display:flex; flex-direction:column; gap:2px;">
+                            <span style="font-size:0.85rem; color:#fff; font-weight:500;">High Fidelity Audio</span>
+                            <p style="margin:0; font-size:0.72rem; color:rgba(255,255,255,0.4);">Enhance WebRTC signal connection streams</p>
+                        </div>
+                        <input type="checkbox" checked style="accent-color:#a855f7; width:16px; height:16px; cursor:pointer;">
+                    </div>
+                    <div class="settings-toggle-row">
+                        <div style="display:flex; flex-direction:column; gap:2px;">
+                            <span style="font-size:0.85rem; color:#fff; font-weight:500;">Auto-Translate Streams</span>
+                            <p style="margin:0; font-size:0.72rem; color:rgba(255,255,255,0.4);">Intercept and translate bubbles automatically</p>
+                        </div>
+                        <input type="checkbox" style="accent-color:#a855f7; width:16px; height:16px; cursor:pointer;">
+                    </div>
+                </div>
+
+                <div class="settings-card-wrapper" style="border-color:rgba(239,68,68,0.15);">
+                    <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:#ef4444; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Maintenance Core</h4>
+                    <div class="settings-toggle-row" style="border:none;">
+                        <div style="display:flex; flex-direction:column; gap:2px; min-width:0; flex:1;">
+                            <span style="font-size:0.85rem; color:#fff; font-weight:500;">Clear Local Cache Files</span>
+                            <p style="margin:0; font-size:0.72rem; color:rgba(255,255,255,0.4); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Flush system temporary memory assets cleanly</p>
+                        </div>
+                        <button onclick="alert('System cache successfully wiped!')" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.2); color:#ef4444; padding:6px 14px; border-radius:6px; font-size:0.78rem; font-weight:600; cursor:pointer;">Purge Storage</button>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
 
+     <!-- WebRTC Operational Overlay Overlay -->
     <div class="call-screen" id="callScreen">
         <div class="video-container">
             <video id="remoteVideo" autoplay playsinline></video>
             <video id="localVideo" autoplay playsinline muted></video>
         </div>
+
         <div class="call-ui-overlay">
             <div class="call-info-block">
                 <h3 id="callName">Peer Identity</h3>
                 <p id="callStatus">HANDSHAKING SYSTEM LINE...</p>
             </div>
+
             <div class="call-controls">
                 <button class="ctrl-btn" id="muteBtn" onclick="handleMuteToggle()"><i class="fa-solid fa-microphone"></i></button>
                 <button class="ctrl-btn" id="videoBtn" onclick="handleVideoToggle()"><i class="fa-solid fa-video"></i></button>
@@ -234,6 +416,8 @@
             </div>
         </div>
     </div>
+
+
 
     <div id="immersiveStoryViewer" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
         <div style="position: absolute; top: 15px; left: 5%; width: 90%; height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden;">
