@@ -357,3 +357,108 @@ video#localVideo {
 .ctrl-btn.active-state { background: var(--text-secondary); color: #111; }
 .ctrl-btn.hangup { background: var(--danger); }
 .ctrl-btn.hangup:hover { background: #b8002c; }
+
+/* ==================== 🛡️ CYBER-ARMOR LINK SCANNER ==================== */
+.cyber-warning-box {
+    background: rgba(234, 0, 56, 0.1);
+    border: 1px solid rgba(234, 0, 56, 0.3);
+    border-left: 3px solid var(--danger);
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 6px;
+    font-size: 0.8rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.cyber-warning-header {
+    color: var(--danger);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.75rem;
+}
+
+.cyber-warning-link {
+    color: #ff6b8b;
+    text-decoration: underline;
+    word-break: break-all;
+    font-family: monospace;
+    font-size: 0.75rem;
+    display: block;
+    padding: 6px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 4px;
+}
+
+.safe-link {
+    color: var(--accent-blue);
+    text-decoration: underline;
+    word-break: break-all;
+    font-weight: 500;
+}
+
+
+/* ==================== 🗑️ DELETE BUTTON MECHANICS ==================== */
+.delete-msg-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    font-size: 0.75rem;
+    margin-left: 6px;
+    margin-right: 4px;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.delete-msg-btn:hover {
+    color: var(--danger, #ea0038);
+    transform: scale(1.1);
+}
+
+/* ==================== 🛡️ CYBER-ARMOR LINK SCANNER ==================== */
+.cyber-warning-box {
+    background: rgba(234, 0, 56, 0.1);
+    border: 1px solid rgba(234, 0, 56, 0.3);
+    border-left: 3px solid var(--danger);
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 6px;
+    font-size: 0.8rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.cyber-warning-header {
+    color: var(--danger);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.75rem;
+}
+
+.cyber-warning-link {
+    color: #ff6b8b;
+    text-decoration: underline;
+    word-break: break-all;
+    font-family: monospace;
+    font-size: 0.75rem;
+    display: block;
+    padding: 6px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 4px;
+}
+
+.safe-link {
+    color: var(--accent-blue);
+    text-decoration: underline;
+    word-break: break-all;
+    font-weight: 500;
+}

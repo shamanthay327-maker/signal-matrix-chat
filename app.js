@@ -45,7 +45,7 @@ const servers = {
 // =========================================================================
 // 💎 CONNECT HANDSHAKER
 // =========================================================================
-function login() {
+function submitLogin() { // 👈 CHANGED THIS LINE
     const phone = document.getElementById("phone").value.trim();
     if (!phone) {
         alert("Please provide a phone code entry value.");
@@ -84,7 +84,6 @@ function login() {
         listenForNetworkStatusNotes();
     });
 }
-
 // =========================================================================
 // 💎 DIRECTORY MANAGER WITH TIMESTAMP LIVENESS CHECK
 // =========================================================================
@@ -249,29 +248,60 @@ function loadMessages() {
     });
 }
 
+// =========================================================================
+// 🗑️ MESSAGE DELETION PIPELINE
+// =========================================================================
+function deleteMessage(messageKey) {
+    if (!chatWith || !me) return;
+    
+    // Safety lock: confirm before purging the data
+    if (!confirm("Permanently delete this message from the matrix?")) return;
+
+    const id = chatId(me, chatWith);
+    
+    // Target the specific message node in Firebase and wipe it
+    db.ref("chats/" + id + "/" + messageKey).remove()
+        .then(() => {
+            // Instantly remove the bubble from the screen for a snappy UI
+            const msgElement = document.getElementById(`msg-${messageKey}`);
+            if (msgElement) {
+                msgElement.style.transform = "scale(0.9)";
+                msgElement.style.opacity = "0";
+                setTimeout(() => msgElement.remove(), 200); // Smooth fade out
+            }
+        })
+        .catch(err => console.error("Deletion failed:", err));
+}
+
+// =========================================================================
+// 💬 RENDER MESSAGE ENGINE (MASTER ASSEMBLED VERSION)
+// =========================================================================
 async function renderMessage(m, isMe, key) {
     const box = document.getElementById("chatBox");
     if(document.getElementById(`msg-${key}`)) return;
 
+    // 1. Create Row & Target ID
     const row = document.createElement("div");
     row.id = `msg-${key}`;
     row.className = `msg-row ${isMe ? "sent" : "received"}`;
+    row.style.transition = "all 0.2s ease-out"; 
 
     const mobileSelectedLang = document.getElementById("myDisplayLanguage") ? document.getElementById("myDisplayLanguage").value : "en";
     let messageBodyText = m.text || "";
     let wasMessageDecryptedSuccess = false;
-    let isInlineMediaContent = m.type === "image";
+    let isInlineMediaContent = m.type === "image" || (m.text && m.text.startsWith("data:image/"));
 
-    // ✨ DECRYPTION INTERCEPTOR ENGINE: Only run decoding loop if payload is pure text string blocks
+    // 2. YOUR CUSTOM DECRYPTION & AI TRANSLATION LOGIC
     if (m.encrypted && !isInlineMediaContent) {
         messageBodyText = decryptStringPayloadCore(m.text, cryptographicSecretKey);
         wasMessageDecryptedSuccess = !messageBodyText.includes("Shared Secret Key Misalignment");
     }
 
     if (!isMe && mobileSelectedLang !== "en" && !isInlineMediaContent) {
-        messageBodyText = await translateTextForMobile(messageBodyText, mobileSelectedLang);
+        messageBodyText = await translateTextForMobile(messageBodyText, mobileSelectedLang); 
     }
 
+    // 3. YOUR CUSTOM ACTION PILLS
     let actionPillMarkup = "";
     if (!!isMe === false && !isInlineMediaContent) { 
         actionPillMarkup = `
@@ -282,27 +312,75 @@ async function renderMessage(m, isMe, key) {
         `;
     }
 
+    // 4. YOUR CUSTOM SECURE LOCK TAGS
     let secureLockMarkupTag = wasMessageDecryptedSuccess 
         ? `<div class="e2ee-signature-tag"><i class="fa-solid fa-lock" style="font-size:0.55rem; margin-right:3px;"></i>E2EE Decrypted</div>` 
         : (m.encrypted && !isInlineMediaContent ? `<div class="e2ee-signature-tag" style="color:#ef4444;"><i class="fa-solid fa-lock-open" style="font-size:0.55rem; margin-right:3px;"></i>Encrypted Line Locked</div>` : '');
 
-    // DYNAMIC LAYOUT COMPILED BUBBLE CONTROLLER: Check if it's text or an image string asset
+    // 5. YOUTUBE & LINK DETECTOR REGEX
+    const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const ytMatch = messageBodyText.match(youtubeRegex);
+    const generalLinkRegex = /(https?:\/\/[^\s]+)/g;
+    const safeDomains = ["youtube.com", "youtu.be", "google.com", "github.com", "linkedin.com"];
+
+    // 6. DYNAMIC LAYOUT COMPILED BUBBLE CONTROLLER
     let bubbleContentInnerMarkup = "";
+    
     if (isInlineMediaContent) {
         bubbleContentInnerMarkup = `
             <div class="msg-inline-media-container" onclick="launchStandaloneAttachmentZoomView('${btoa(m.text)}')">
                 <img src="${m.text}">
             </div>
         `;
+    } else if (ytMatch && ytMatch[1]) {
+        const ytVideoId = ytMatch[1];
+        bubbleContentInnerMarkup = `
+            <div class="msg-text-payload" id="text-${key}" style="margin-bottom: 8px;">
+                ${escapeHTML(messageBodyText.replace(ytMatch[0], '').trim())}
+            </div>
+            <div class="msg-inline-media-container" style="border-radius: 8px; overflow: hidden; margin-top: 4px;">
+                <iframe width="100%" height="200" src="https://www.youtube.com/embed/${ytVideoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);"></iframe>
+            </div>
+        `;
+    } else if (messageBodyText.match(generalLinkRegex)) {
+        let processedText = escapeHTML(messageBodyText).replace(generalLinkRegex, (url) => {
+            try {
+                const urlObj = new URL(url);
+                const domain = urlObj.hostname.replace('www.', '');
+                if (safeDomains.includes(domain)) {
+                    return `<a href="${url}" target="_blank" class="safe-link">${url}</a>`;
+                } else {
+                    return `
+                        <div class="cyber-warning-box">
+                            <div class="cyber-warning-header">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Security Alert
+                            </div>
+                            <span style="color: rgba(255,255,255,0.7); display: block; margin-bottom: 6px; line-height: 1.3;">
+                                Unverified external link. Do not share OTPs, passwords, or install APKs from this source.
+                            </span>
+                            <a href="${url}" target="_blank" class="cyber-warning-link">${url}</a>
+                        </div>
+                    `;
+                }
+            } catch(e) { return url; }
+        });
+        bubbleContentInnerMarkup = `
+            <div class="msg-text-payload" id="text-${key}">
+                ${processedText}
+            </div>
+        `;
     } else {
         bubbleContentInnerMarkup = `
             <div class="msg-text-payload" id="text-${key}">
                 ${escapeHTML(messageBodyText)}
-                ${!isMe && mobileSelectedLang !== "en" ? `<br><small style="color:var(--accent-blue, #53bdeb); font-size:0.65rem; opacity:0.8;">✨ Auto-Translated</small>` : ''}
             </div>
         `;
     }
 
+    // 7. INJECT DELETE BUTTON ONLY FOR MESSAGES YOU SENT
+    let deleteBtnMarkup = isMe ? `<button onclick="deleteMessage('${key}')" class="delete-msg-btn" title="Delete Payload"><i class="fa-solid fa-trash-can"></i></button>` : '';
+
+    // 8. FINAL BUBBLE ASSEMBLY
     row.innerHTML = `
         <div class="msg-bubble">
             ${bubbleContentInnerMarkup}
@@ -310,25 +388,15 @@ async function renderMessage(m, isMe, key) {
             ${actionPillMarkup}
             <div class="msg-meta">
                 ${formatTime(m.time)}
+                ${deleteBtnMarkup}
                 ${isMe ? getTicks(m.status) : ""}
             </div>
         </div>
     `;
+    
     box.appendChild(row);
     box.scrollTop = box.scrollHeight;
 }
-
-function markSeen() {
-    if (!chatWith) return;
-    const id = chatId(me, chatWith);
-    db.ref("chats/" + id).once("value", snap => {
-        snap.forEach(child => {
-            const m = child.val();
-            if (m.sender !== me && m.status !== "seen") { child.ref.update({ status: "seen" }); }
-        });
-    });
-}
-
 // =========================================================================
 // 💎 VERNACULAR AI PIPELINES
 // =========================================================================
@@ -1221,3 +1289,28 @@ function formatTime(ts) { if (!ts) return ""; const d = new Date(ts); return d.t
 function getTicks(status) { if (status === "sent") return '<i class="fa-solid fa-check" style="color:var(--text-secondary)"></i>'; if (status === "delivered") return '<i class="fa-solid fa-check-double" style="color:var(--text-secondary)"></i>'; if (status === "seen") return '<i class="fa-solid fa-check-double" style="color: var(--accent-blue)"></i>'; return ""; }
 function onClickInputFocus() { setTimeout(() => { const box = document.getElementById("chatBox"); if (box) box.scrollTop = box.scrollHeight; }, 250); }
 document.getElementById("message").addEventListener("focus", onClickInputFocus);
+
+// =========================================================================
+// 🗑️ MESSAGE DELETION PIPELINE
+// =========================================================================
+function deleteMessage(messageKey) {
+    if (!chatWith || !me) return;
+    
+    // Safety lock: confirm before purging the data
+    if (!confirm("Permanently delete this message from the matrix?")) return;
+
+    const id = chatId(me, chatWith);
+    
+    // Target the specific message node in Firebase and wipe it
+    db.ref("chats/" + id + "/" + messageKey).remove()
+        .then(() => {
+            // Instantly remove the bubble from the screen for a snappy UI
+            const msgElement = document.getElementById(`msg-${messageKey}`);
+            if (msgElement) {
+                msgElement.style.transform = "scale(0.9)";
+                msgElement.style.opacity = "0";
+                setTimeout(() => msgElement.remove(), 200); // Smooth fade out
+            }
+        })
+        .catch(err => console.error("Deletion failed:", err));
+}
