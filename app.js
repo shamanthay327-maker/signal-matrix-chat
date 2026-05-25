@@ -397,6 +397,22 @@ async function renderMessage(m, isMe, key) {
     box.appendChild(row);
     box.scrollTop = box.scrollHeight;
 }
+
+// =========================================================================
+// 💎 MARK SEEN PIPELINE
+// =========================================================================
+function markSeen() {
+    if (!chatWith || !me) return;
+    const id = chatId(me, chatWith);
+    db.ref("chats/" + id).once("value", snap => {
+        snap.forEach(child => {
+            const m = child.val();
+            if (m.sender !== me && m.status !== "seen") {
+                child.ref.update({ status: "seen" });
+            }
+        });
+    });
+}
 // =========================================================================
 // 💎 VERNACULAR AI PIPELINES
 // =========================================================================
@@ -447,14 +463,26 @@ document.getElementById("message").addEventListener("input", () => {
 });
 
 function listenTyping() {
-    db.ref("typing").on("value", snap => {
+    if (!me) return;
+    
+    // Listen ONLY to the node where someone is typing to YOU
+    db.ref("typing").orderByChild("to").equalTo(me).on("value", snap => {
         const data = snap.val();
         let isTyping = false;
-        if (data && chatWith && data[chatWith]) { if (data[chatWith].to === me && data[chatWith].typing) { isTyping = true; } }
-        document.getElementById("typingIndicator").style.display = isTyping ? "block" : "none";
+        
+        if (data) {
+            // Check if anyone in the list is typing to 'me'
+            Object.values(data).forEach(userStatus => {
+                if (userStatus.sender === chatWith && userStatus.typing) {
+                    isTyping = true;
+                }
+            });
+        }
+        
+        const indicator = document.getElementById("typingIndicator");
+        if (indicator) indicator.style.display = isTyping ? "block" : "none";
     });
 }
-
 // =========================================================================
 // 💎 WEBRTC AV SIGNALING LAYER (FIXED HARDWARE TOGGLES)
 // =========================================================================
