@@ -305,6 +305,7 @@ body {
 
 /* ==================== 📞 HARDWARE WEBRTC OVERLAYS FIX ==================== */
 /* Full-Frame calling layout components */
+/* Full-Frame calling layout components */
 .call-screen {
     position: fixed;
     inset: 0;
@@ -357,7 +358,6 @@ video#localVideo {
 .ctrl-btn.active-state { background: var(--text-secondary); color: #111; }
 .ctrl-btn.hangup { background: var(--danger); }
 .ctrl-btn.hangup:hover { background: #b8002c; }
-
 /* ==================== 🛡️ CYBER-ARMOR LINK SCANNER ==================== */
 .cyber-warning-box {
     background: rgba(234, 0, 56, 0.1);
@@ -420,6 +420,13 @@ video#localVideo {
     transform: scale(1.1);
 }
 
+.msg-meta .delete-msg-btn {
+    display: inline-flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+
 /* ==================== 🛡️ CYBER-ARMOR LINK SCANNER ==================== */
 .cyber-warning-box {
     background: rgba(234, 0, 56, 0.1);
@@ -462,3 +469,17 @@ video#localVideo {
     word-break: break-all;
     font-weight: 500;
 }
+
+#screenMask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px);
+    z-index: 99999;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    color: var(--accent-blue);
+    font-weight: bold;
+    letter-spacing: 2px;
+}   

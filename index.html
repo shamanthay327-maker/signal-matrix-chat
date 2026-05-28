@@ -359,6 +359,10 @@
                         </button>
                         <button onclick="applyGlobalCinematicTheme('matrix')" style="background: #000000; border: 1px solid rgba(255,255,255,0.05); color: #fff; padding: 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
                             <i class="fa-solid fa-terminal" style="color: #00ff00;"></i> Digital Matrix
+                         <div class="chat-actions">
+                        <button onclick="startCall()" title="Audio channel link"><i class="fa-solid fa-phone"></i></button>
+                        <button onclick="startVideoCall()" title="Video matrix sync"><i class="fa-solid fa-video"></i></button>
+
                         </button>
                     </div>
                 </div>
@@ -396,7 +400,7 @@
         </div>
     </div>
 
-     <!-- WebRTC Operational Overlay Overlay -->
+    <!-- WebRTC Operational Overlay Overlay -->
     <div class="call-screen" id="callScreen">
         <div class="video-container">
             <video id="remoteVideo" autoplay playsinline></video>
@@ -416,6 +420,7 @@
             </div>
         </div>
     </div>
+
 
 
 
@@ -439,7 +444,7 @@
             <p style="margin:0; color:rgba(255,255,255,0.4); font-size:0.9rem;">Cloud network reel stream setup finalized successfully.</p>
         </div>
     </div>
-
+<div id="screenMask">MATRIX TERMINAL LOCKED</div>
     <script src="app.js"></script>
 </body>
 </html>

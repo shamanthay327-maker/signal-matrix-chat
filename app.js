@@ -192,6 +192,27 @@ function goBack() {
     if (msgRef) { msgRef.off(); msgRef = null; }
 }
 
+// =========================================================================
+// 🛡️ PROJECT X-25 SENTINEL: ENTROPY SCANNER
+// =========================================================================
+function scanPayloadForThreats(payload) {
+    const data = typeof payload === 'string' ? new TextEncoder().encode(payload) : payload;
+    const len = data.length;
+    if (len === 0) return true;
+
+    const frequencies = {};
+    for (let i = 0; i < len; i++) frequencies[data[i]] = (frequencies[data[i]] || 0) + 1;
+
+    let entropy = 0;
+    for (const byte in frequencies) {
+        const p = frequencies[byte] / len;
+        entropy -= p * Math.log2(p);
+    }
+    
+    // Sentinel Threshold: > 7.5 indicates high-density/hidden binary payload
+    return entropy < 7.5; 
+}
+
 function sendMessage() {
     const input = document.getElementById("message");
     const text = input.value.trim();
@@ -231,21 +252,57 @@ function loadMessages() {
         const m = snap.val();
         const key = snap.key;
         const isMe = m.sender === me;
+        
         if (!isMe && m.status !== "seen") {
             db.ref("chats/" + id + "/" + key).update({ status: chatWith === m.sender ? "seen" : "delivered" });
         }
+        
+        // 1. Render the message first
         renderMessage(m, isMe, key);
+
+        // Ensure this block in renderMessage is robust:
+let deleteBtnMarkup = isMe ? 
+    `<button onclick="deleteMessage('${key}')" class="delete-msg-btn" title="Delete Payload">
+        <i class="fa-solid fa-trash-can"></i>
+     </button>` : '';
+
+// Ensure this is inside the template literal passed to row.innerHTML:
+row.innerHTML = `
+    <div class="msg-bubble">
+        ${bubbleContentInnerMarkup}
+        ${secureLockMarkupTag}
+        ${actionPillMarkup}
+        <div class="msg-meta">
+            ${formatTime(m.time)}
+            ${deleteBtnMarkup}  ${isMe ? getTicks(m.status) : ""}
+        </div>
+    </div>
+`;
+        
+        // 2. Apply "Quantum" Scanning Effect
+        const msgElement = document.getElementById(`msg-${key}`);
+        if (msgElement) {
+            msgElement.classList.add("scanning");
+            // Remove the scan effect after animation finishes (1.5s)
+            setTimeout(() => {
+                msgElement.classList.remove("scanning");
+            }, 1500);
+        }
     });
 
     msgRef.on("child_changed", snap => {
-        const m = snap.val();
-        const key = snap.key;
-        const element = document.getElementById(`msg-${key}`);
-        if (element && m.sender === me) {
-            const metaBox = element.querySelector(".msg-meta");
-            metaBox.innerHTML = `${formatTime(m.time)} ${getTicks(m.status)}`;
-        }
-    });
+    const m = snap.val();
+    const key = snap.key;
+    const element = document.getElementById(`msg-${key}`);
+    if (element && m.sender === me) {
+        const metaBox = element.querySelector(".msg-meta");
+        // ⚠️ DANGER: If you overwrite innerHTML here, you wipe the button!
+        // CHANGE THIS:
+        metaBox.innerHTML = `${formatTime(m.time)} ${getTicks(m.status)}`;
+        // TO THIS:
+        metaBox.innerHTML = `${formatTime(m.time)} <button onclick="deleteMessage('${key}')" class="delete-msg-btn"><i class="fa-solid fa-trash-can"></i></button> ${getTicks(m.status)}`;
+    }
+});
 }
 
 // =========================================================================
@@ -484,7 +541,7 @@ function listenTyping() {
     });
 }
 // =========================================================================
-// 💎 WEBRTC AV SIGNALING LAYER (FIXED HARDWARE TOGGLES)
+// 💎 WEBRTC AV SIGNALING LAYER (STEALTH SYNC INTEGRATED)
 // =========================================================================
 function startCall() { startRealtimeCall(false); }
 function startVideoCall() { startRealtimeCall(true); }
@@ -687,7 +744,181 @@ function handleVideoToggle() {
     updateBtnUI("videoBtn", videoEnabled, videoEnabled ? '<i class="fa-solid fa-video"></i>' : '<i class="fa-solid fa-video-slash"></i>');
 }
 
+// ================= HEARTBEAT NODE PRESENCE LAYER =================
+function startPresence() {
+    const myPresenceRef = db.ref("users/" + me);
+    
+    myPresenceRef.onDisconnect().update({
+        online: false,
+        lastSeen: firebase.database.ServerValue.TIMESTAMP
+    });
 
+    presenceIntervalId = setInterval(() => {
+        myPresenceRef.update({
+            online: true,
+            lastSeen: firebase.database.ServerValue.TIMESTAMP
+        });
+    }, 8000);
+}
+
+function logout() {
+    clearInterval(presenceIntervalId);
+    if (me) {
+        db.ref("users/" + me).update({
+            online: false,
+            lastSeen: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+            location.reload();
+        });
+    } else {
+        location.reload();
+    }
+}
+
+
+// =========================================================================
+// 🛡️ PROJECT X-25 SENTINEL: ENTROPY SCANNER
+// =========================================================================
+function scanPayloadForThreats(payload) {
+    const data = typeof payload === 'string' ? new TextEncoder().encode(payload) : payload;
+    const len = data.length;
+    if (len === 0) return true;
+    const frequencies = {};
+    for (let i = 0; i < len; i++) frequencies[data[i]] = (frequencies[data[i]] || 0) + 1;
+    let entropy = 0;
+    for (const byte in frequencies) {
+        const p = frequencies[byte] / len;
+        entropy -= p * Math.log2(p);
+    }
+    return entropy < 7.5; // Sentinel Threshold
+}
+
+function renderWarningMessage(text) {
+    const box = document.getElementById("chatBox");
+    const div = document.createElement("div");
+    div.className = "cyber-warning-box";
+    div.innerHTML = `<div class="cyber-warning-header"><i class="fa-solid fa-shield-halved"></i> X-25 SENTINEL ALERT</div>${text}`;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
+
+// =========================================================================
+// 💎 WEBRTC AV SIGNALING LAYER (STEALTH SYNC + SENTINEL INTEGRATED)
+// =========================================================================
+
+function setupDataChannel(pc) {
+    dataChannel = pc.createDataChannel("secureMatrixTunnel");
+    dataChannel.onopen = () => console.log("🔒 Stealth Tunnel Active: P2P Data Enabled.");
+    dataChannel.onmessage = (event) => {
+        const incomingData = JSON.parse(event.data);
+        // 🛡️ SENTINEL SCAN BEFORE RENDERING
+        if (scanPayloadForThreats(JSON.stringify(incomingData))) {
+            renderMessage(incomingData, false, Date.now());
+        } else {
+            renderWarningMessage("HIGH ENTROPY DETECTED: Payload blocked to prevent code injection.");
+        }
+    };
+}
+
+function startCall() { startRealtimeCall(false); }
+function startVideoCall() { startRealtimeCall(true); }
+
+async function startRealtimeCall(video = false) {
+    if (!chatWith) return;
+    currentCallId = chatId(me, chatWith);
+    remoteIceCandidatesQueue = [];
+    configureCallUIElements(chatWith, "Calling Peer...");
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: video });
+        document.getElementById("localVideo").srcObject = localStream;
+        peerConnection = new RTCPeerConnection(servers);
+        setupDataChannel(peerConnection); // 🚀 Initialize Tunnel
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        peerConnection.ontrack = event => {
+            const remoteVideo = document.getElementById("remoteVideo");
+            if (remoteVideo.srcObject !== event.streams[0]) {
+                remoteVideo.srcObject = event.streams[0];
+                document.getElementById("callStatus").innerText = "CONNECTED LINE";
+            }
+        };
+        peerConnection.onicecandidate = event => {
+            if (event.candidate) db.ref(`calls/${currentCallId}/offerCandidates`).push(JSON.stringify(event.candidate));
+        };
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        await db.ref("calls/" + currentCallId).set({
+            caller: me, receiver: chatWith, offer: JSON.stringify(offer),
+            type: video ? "video" : "audio", timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        listenForAnswer();
+    } catch (err) {
+        console.error("AV Initialization Terminal Fault:", err);
+        alert("Media Interface access denied.");
+        endCall();
+    }
+}
+
+function listenForIncomingCalls() {
+    db.ref("calls").on("child_added", async snap => {
+        const data = snap.val();
+        if (!data || data.receiver !== me) return;
+        if (data.timestamp && Date.now() - data.timestamp > 45000) return;
+        currentCallId = snap.key;
+        remoteIceCandidatesQueue = [];
+        const ringer = document.getElementById("ringtone");
+        try { ringer.play(); } catch(e){}
+        const accept = confirm(`Incoming synchronization channel requested by ${data.caller}. Open pipeline?`);
+        ringer.pause(); ringer.currentTime = 0;
+        if (!accept) { db.ref("calls/" + currentCallId).remove(); return; }
+        configureCallUIElements(data.caller, "STABILIZING CHANNEL...");
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: data.type === "video" });
+            document.getElementById("localVideo").srcObject = localStream;
+            peerConnection = new RTCPeerConnection(servers);
+            // 🛡️ Listen for incoming DataChannel + SENTINEL SCAN
+            peerConnection.ondatachannel = (event) => {
+                dataChannel = event.channel;
+                dataChannel.onmessage = (e) => {
+                    const incoming = JSON.parse(e.data);
+                    if (scanPayloadForThreats(JSON.stringify(incoming))) {
+                        renderMessage(incoming, false, Date.now());
+                    } else {
+                        renderWarningMessage("HIGH ENTROPY DETECTED: Payload blocked.");
+                    }
+                };
+            };
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            peerConnection.ontrack = event => {
+                const remoteVideo = document.getElementById("remoteVideo");
+                if (remoteVideo.srcObject !== event.streams[0]) {
+                    remoteVideo.srcObject = event.streams[0];
+                    document.getElementById("callStatus").innerText = "CONNECTED LINE";
+                }
+            };
+            peerConnection.onicecandidate = event => {
+                if (event.candidate) db.ref(`calls/${currentCallId}/answerCandidates`).push(JSON.stringify(event.candidate));
+            };
+            const offer = JSON.parse(data.offer);
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            await db.ref(`calls/${currentCallId}`).update({ answer: JSON.stringify(answer) });
+            processBufferedRemoteCandidates();
+            db.ref(`calls/${currentCallId}/offerCandidates`).on("child_added", s => {
+                const candidateData = JSON.parse(s.val());
+                if (peerConnection && peerConnection.remoteDescription) {
+                    peerConnection.addIceCandidate(new RTCIceCandidate(candidateData)).catch(e => {});
+                } else {
+                    remoteIceCandidatesQueue.push(candidateData);
+                }
+            });
+            db.ref(`calls/${currentCallId}`).on("value", s => { if (!s.exists()) teardownCallState(); });
+        } catch (err) {
+            console.error("Media Channel Failure:", err);
+            endCall();
+        }
+    });
+}
 // =========================================================================
 // 💎 INSTAGRAM STATUS NOTES LOGIC PLATFORM
 // =========================================================================
@@ -1342,3 +1573,44 @@ function deleteMessage(messageKey) {
         })
         .catch(err => console.error("Deletion failed:", err));
 }
+
+function renderWarningMessage(text) {
+    const box = document.getElementById("chatBox");
+    const div = document.createElement("div");
+    div.className = "cyber-warning-box";
+    div.innerHTML = `
+        <div class="cyber-warning-header">
+            <i class="fa-solid fa-shield-halved"></i> X-25 SENTINEL ALERT
+        </div>
+        ${text}
+    `;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight; // Auto-scroll to the alert
+}
+
+
+// =========================================================================
+// 🛡️ PROJECT X-25: ANTI-EXFILTRATION ENGINE
+// =========================================================================
+document.addEventListener("visibilitychange", () => {
+    const mask = document.getElementById("screenMask");
+    if (document.hidden) {
+        // App is hidden/backgrounded - Trigger Blackout
+        mask.style.display = "flex";
+        mask.innerText = "MATRIX TERMINAL LOCKED: PRIVACY MODE ACTIVE";
+    } else {
+        // App is back in focus
+        mask.style.display = "none";
+    }
+});
+
+// Detect window blurring (e.g., user clicking into a screen recording tool)
+window.addEventListener("blur", () => {
+    const mask = document.getElementById("screenMask");
+    mask.style.display = "flex";
+    mask.innerText = "SECURITY WARNING: WINDOW FOCUS LOST";
+});
+
+window.addEventListener("focus", () => {
+    document.getElementById("screenMask").style.display = "none";
+});
