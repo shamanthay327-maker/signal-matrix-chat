@@ -244,6 +244,7 @@
                     </div>
                 </div>
                 <div class="chat-box" id="chatBox"></div>
+                
                 <div class="chat-input-bar">
                     <input type="file" id="chatInlineMediaUploader" accept="image/*" onchange="processInlineChatAttachment(event)" style="display: none;">
                     
@@ -318,6 +319,38 @@
     </div>
 
     <div id="settingsMainStage" class="settings-main-stage">
+        <div class="theme-selector-wrapper">
+    <h3 style="margin-bottom:15px; font-size: 0.9rem; color:var(--text-secondary);">Chat Background</h3>
+    <div class="bg-grid-options">
+        <div class="bg-option bg-grid" onclick="changeChatBackground('bg-grid')"></div>
+        <div class="bg-option bg-aether" onclick="changeChatBackground('bg-aether')"></div>
+        <div class="bg-option bg-carbon" onclick="changeChatBackground('bg-carbon')"></div>
+        <div class="bg-option bg-void" onclick="changeChatBackground('bg-void')"></div>
+    </div>
+</div>
+        <div class="settings-profile-panel">
+            <div class="theme-selector-wrapper">
+    <h3 style="margin-bottom:15px; font-size: 0.9rem; color:var(--text-secondary);">Select Visual Atmosphere</h3>
+    <div class="theme-grid">
+        <div class="theme-option" data-theme="obsidian" onclick="setTheme('obsidian')" style="background: #020617;"></div>
+        <div class="theme-option" data-theme="neptune" onclick="setTheme('neptune')" style="background: #1e1b4b;"></div>
+        <div class="theme-option" data-theme="ghost" onclick="setTheme('ghost')" style="background: #f1f5f9; border: 1px solid #ccc;"></div>
+    </div>
+</div>
+    <div class="profile-avatar-wrapper" onclick="document.getElementById('dpUploader').click()">
+        <div id="settingsPreview" class="avatar-large">UP</div>
+        <div class="avatar-overlay"><i class="fa-solid fa-camera"></i></div>
+    </div>
+    <input type="file" id="dpUploader" hidden accept="image/*" onchange="uploadProfileDP(event)">
+    
+    <h3 style="margin-top: 15px; color: var(--text-primary);">Account Identity</h3>
+    <div class="avatar-presets">
+        <div class="preset" onclick="setAvatar('🤖')">🤖</div>
+        <div class="preset" onclick="setAvatar('🚀')">🚀</div>
+        <div class="preset" onclick="setAvatar('🛡️')">🛡️</div>
+        <div class="preset" onclick="setAvatar('🛰️')">🛰️</div>
+    </div>
+</div>
         
         <div style="height: 65px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; padding: 0 24px; background: #111113; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 14px;">
@@ -444,6 +477,9 @@
             <p style="margin:0; color:rgba(255,255,255,0.4); font-size:0.9rem;">Cloud network reel stream setup finalized successfully.</p>
         </div>
     </div>
+
+   
+</div>
 <div id="screenMask">MATRIX TERMINAL LOCKED</div>
     <script src="app.js"></script>
 </body>

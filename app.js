@@ -99,21 +99,32 @@ function loadUsers() {
             const user = u.val();
             if (!user || !user.phone || user.phone === me) return;
 
-            const isLivenessActive = user.online && user.lastSeen && (now - user.lastSeen < 20000);
-            const statusDot = isLivenessActive 
-                ? '<span class="status-badge status-online">🟢 Online</span>' 
-                : '<span class="status-badge status-offline">⚪ Offline</span>';
-                
+            // 💎 DYNAMIC AVATAR LOGIC
+            let avatarContent = user.phone.substring(0,2).toUpperCase(); // Default: Initials
+            
+            if (user.profilePic) {
+                // If an image exists, render it
+                avatarContent = `<img src="${user.profilePic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+            } else if (user.avatar) {
+                // If an emoji preset exists, render it
+                avatarContent = user.avatar;
+            }
+
+            const isOnline = user.online;
+            const statusDot = isOnline ? '<span class="status-badge status-online">🟢 Online</span>' : '<span class="status-badge status-offline">⚪ Offline</span>';
             const activeClass = chatWith === user.phone ? 'active' : '';
+
 
             list.innerHTML += `
                 <div class="chat-item ${activeClass}" onclick="openChat('${user.phone}')">
-                    <div class="avatar-placeholder">${user.phone.substring(0,2).toUpperCase()}</div>
+                    <div class="avatar-placeholder" style="display:flex; justify-content:center; align-items:center; overflow:hidden;">
+                        ${avatarContent}
+                    </div>
                     <div class="chat-info">
                         <div class="chat-meta">
                             <div class="chat-name">${user.phone}</div>
+                            <div style="font-size: 0.6rem;">${statusDot}</div>
                         </div>
-                        <div style="font-size: 0.8rem;">${statusDot}</div>
                     </div>
                 </div>
             `;
@@ -121,7 +132,6 @@ function loadUsers() {
         triggerSyncNotesOnDirectory();
     });
 }
-
 function chatId(a, b) {
     return [a, b].sort().join("_");
 }
@@ -259,6 +269,27 @@ function loadMessages() {
         
         // 1. Render the message first
         renderMessage(m, isMe, key);
+        // Inside your renderMessage(m, isMe, key) function:
+
+row.innerHTML = `
+    <div class="msg-bubble">
+        <div class="reaction-menu">
+            <span onclick="react(this, '❤️', '${key}')">❤️</span>
+            <span onclick="react(this, '🚀', '${key}')">🚀</span>
+            <span onclick="react(this, '🛡️', '${key}')">🛡️</span>
+            <span onclick="react(this, '🔥', '${key}')">🔥</span>
+        </div>
+        
+        ${bubbleContentInnerMarkup}
+        ${secureLockMarkupTag}
+        ${actionPillMarkup}
+        <div class="msg-meta">
+            ${formatTime(m.time)}
+            ${deleteBtnMarkup}
+            ${isMe ? getTicks(m.status) : ""}
+        </div>
+    </div>
+`;
 
         // Ensure this block in renderMessage is robust:
 let deleteBtnMarkup = isMe ? 
@@ -337,8 +368,9 @@ async function renderMessage(m, isMe, key) {
     const box = document.getElementById("chatBox");
     if(document.getElementById(`msg-${key}`)) return;
 
-    // 1. Create Row & Target ID
+    // 🚀 THIS IS THE LINE THAT WAS MISSING
     const row = document.createElement("div");
+    
     row.id = `msg-${key}`;
     row.className = `msg-row ${isMe ? "sent" : "received"}`;
     row.style.transition = "all 0.2s ease-out"; 
@@ -374,7 +406,7 @@ async function renderMessage(m, isMe, key) {
         ? `<div class="e2ee-signature-tag"><i class="fa-solid fa-lock" style="font-size:0.55rem; margin-right:3px;"></i>E2EE Decrypted</div>` 
         : (m.encrypted && !isInlineMediaContent ? `<div class="e2ee-signature-tag" style="color:#ef4444;"><i class="fa-solid fa-lock-open" style="font-size:0.55rem; margin-right:3px;"></i>Encrypted Line Locked</div>` : '');
 
-    // 5. YOUTUBE & LINK DETECTOR REGEX
+    // 5. YOUTUBE & LINK DETECTOR
     const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
     const ytMatch = messageBodyText.match(youtubeRegex);
     const generalLinkRegex = /(https?:\/\/[^\s]+)/g;
@@ -1614,3 +1646,71 @@ window.addEventListener("blur", () => {
 window.addEventListener("focus", () => {
     document.getElementById("screenMask").style.display = "none";
 });
+
+
+//========DP UPLOAD================//
+// 1. Upload DP
+function uploadProfileDP(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64Img = e.target.result;
+        // Save to Firebase
+        db.ref(`users/${me}`).update({ profilePic: base64Img });
+        // Update UI
+        document.getElementById("settingsPreview").innerHTML = `<img src="${base64Img}" style="width:100%; height:100%; object-fit:cover;">`;
+    };
+    reader.readAsDataURL(file);
+}
+
+// 2. Set Preset Avatar
+function setAvatar(emoji) {
+    db.ref(`users/${me}`).update({ avatar: emoji, profilePic: null });
+    document.getElementById("settingsPreview").innerHTML = emoji;
+}
+
+// 3. Sync Profile on Load
+// Add this inside your existing "listenForIncomingCalls" or login logic
+function syncProfileUI() {
+    db.ref(`users/${me}`).on("value", snap => {
+        const data = snap.val();
+        const preview = document.getElementById("settingsPreview");
+        if (!preview) return;
+        
+        if (data.profilePic) {
+            preview.innerHTML = `<img src="${data.profilePic}" style="width:100%; height:100%; object-fit:cover;">`;
+        } else if (data.avatar) {
+            preview.innerHTML = data.avatar;
+        }
+    });
+}
+
+///==========================================================//
+   //CHAT THEME//
+function setTheme(themeName) {
+    document.documentElement.setAttribute('data-theme', themeName);
+    localStorage.setItem('chat-theme', themeName);
+    
+    // Smooth transition effect
+    document.body.style.transition = "background 0.5s ease";
+}
+
+// Initialize on page load
+const savedTheme = localStorage.getItem('chat-theme') || 'obsidian';
+document.documentElement.setAttribute('data-theme', savedTheme);
+
+//=================reaction menu======================//
+// Add this to your app.js
+function react(element, emoji, messageKey) {
+    const bubble = element.closest('.msg-bubble');
+    
+    // 1. Update the Firebase database so the reaction stays there
+    const chatIdVal = chatId(me, chatWith);
+    db.ref(`chats/${chatIdVal}/${messageKey}/reaction`).set(emoji);
+    
+    // 2. Visual feedback pulse
+    bubble.style.borderColor = "var(--accent-blue)";
+    setTimeout(() => bubble.style.borderColor = "rgba(255,255,255,0.05)", 500);
+}
