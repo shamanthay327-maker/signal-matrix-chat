@@ -84,6 +84,8 @@ function submitLogin() { // 👈 CHANGED THIS LINE
         listenForNetworkStatusNotes();
     });
 }
+
+
 // =========================================================================
 // 💎 DIRECTORY MANAGER WITH TIMESTAMP LIVENESS CHECK
 // =========================================================================

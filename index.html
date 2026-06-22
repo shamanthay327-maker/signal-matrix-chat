@@ -127,6 +127,7 @@
             <div class="input-group">
                 <i class="fa-solid fa-phone"></i>
                 <input type="tel" id="phone" class="input-field" placeholder="e.g. +1234567890" required autocomplete="off">
+                
             </div>
             <button class="btn-primary" onclick="submitLogin()">Connect Securely</button>
         </div>
@@ -319,24 +320,15 @@
     </div>
 
     <div id="settingsMainStage" class="settings-main-stage">
-        <div class="theme-selector-wrapper">
-    <h3 style="margin-bottom:15px; font-size: 0.9rem; color:var(--text-secondary);">Chat Background</h3>
-    <div class="bg-grid-options">
-        <div class="bg-option bg-grid" onclick="changeChatBackground('bg-grid')"></div>
-        <div class="bg-option bg-aether" onclick="changeChatBackground('bg-aether')"></div>
-        <div class="bg-option bg-carbon" onclick="changeChatBackground('bg-carbon')"></div>
-        <div class="bg-option bg-void" onclick="changeChatBackground('bg-void')"></div>
-    </div>
-</div>
+     
         <div class="settings-profile-panel">
-            <div class="theme-selector-wrapper">
-    <h3 style="margin-bottom:15px; font-size: 0.9rem; color:var(--text-secondary);">Select Visual Atmosphere</h3>
-    <div class="theme-grid">
-        <div class="theme-option" data-theme="obsidian" onclick="setTheme('obsidian')" style="background: #020617;"></div>
-        <div class="theme-option" data-theme="neptune" onclick="setTheme('neptune')" style="background: #1e1b4b;"></div>
-        <div class="theme-option" data-theme="ghost" onclick="setTheme('ghost')" style="background: #f1f5f9; border: 1px solid #ccc;"></div>
-    </div>
-</div>
+            <div style="height: 65px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; padding: 0 24px; background: #111113; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <button onclick="exitMechanicalSettingsPage()" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 style="margin: 0; font-size: 1.15rem; font-weight: 600;"><i class="fa-solid fa-sliders" style="color:var(--accent-blue, #53bdeb); margin-right:6px;"></i> System Settings Vault</h2>
+            </div>
+        </div>
+     
     <div class="profile-avatar-wrapper" onclick="document.getElementById('dpUploader').click()">
         <div id="settingsPreview" class="avatar-large">UP</div>
         <div class="avatar-overlay"><i class="fa-solid fa-camera"></i></div>
@@ -352,12 +344,7 @@
     </div>
 </div>
         
-        <div style="height: 65px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; padding: 0 24px; background: #111113; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 14px;">
-                <button onclick="exitMechanicalSettingsPage()" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;"><i class="fa-solid fa-arrow-left"></i></button>
-                <h2 style="margin: 0; font-size: 1.15rem; font-weight: 600;"><i class="fa-solid fa-sliders" style="color:var(--accent-blue, #53bdeb); margin-right:6px;"></i> System Settings Vault</h2>
-            </div>
-        </div>
+        
 
         <div class="settings-scroll-deck">
             <div style="max-width: 600px; margin: 10px auto; display: flex; flex-direction: column; gap: 20px;">

@@ -178,42 +178,89 @@ body {
     transition: color 0.3s ease;
 }
 
-.input-field:focus + i {
-    color: var(--accent-blue); /* Icon glows blue when active */
-}
+.input-field:focus {
+    background: rgba(15, 23, 42, 0.6) !important;
+    border-color: var(--accent-blue);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), 
+                0 0 0 4px rgba(59, 130, 246, 0.15);}
 
 /* 5. Placeholder - Subtle Hinting */
-.input-field::placeholder {
-    color: #334155;
-    letter-spacing: 0; /* Keep placeholder readable */
-    font-size: 0.95rem;
-    font-weight: 400;
+/* 2. Precision Input Field */
+.input-field {
+    width: 100%;
+    padding: 18px 20px 18px 55px;
+    
+    /* Deep "sunken" appearance */
+    background: rgba(0, 0, 0, 0.2) !important; 
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    
+    color: #f8fafc;
+    font-size: 1.05rem;
+    font-weight: 500;
+    letter-spacing: 0.12em; /* Precision spacing */
+    
+    /* Inset shadow creates the "pressed-in" look */
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), 
+                0 4px 6px -2px rgba(0,0,0,0.1);
+    
+    outline: none;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* 1. Refined "Obsidian" Auth Card */
 .auth-card {
-    background: rgba(10, 10, 12, 0.8);
-    backdrop-filter: blur(30px);
-    padding: 60px 40px;
-    border-radius: 40px;
+    /* Rich, subtle dark-to-light gradient base */
+    background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(10, 10, 12, 0.95));
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    
+    padding: 60px 45px;
+    border-radius: 36px;
     width: 100%;
     max-width: 400px;
     text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 50px 100px -20px rgba(0,0,0,0.9);
+    
+    /* Double Shadow: 1. Depth, 2. Internal Rim Light for "expensive" look */
+    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.8), 
+                inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+    overflow: hidden;
 }
 
+/* 3. The "Rich" Action Button */
 .btn-primary {
     padding: 18px;
-    background: #3b82f6;
+    width: 100%;
+    
+    /* Layered Gradient for a "Sheen" effect */
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    
+    border: none;
     border-radius: 16px;
+    color: #ffffff;
     font-weight: 700;
+    font-size: 1rem;
     letter-spacing: 0.5px;
-    transition: transform 0.3s ease, background 0.3s ease;
+    
+    /* Physical depth */
+    box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.4), 
+                inset 0 1px 1px rgba(255, 255, 255, 0.2); /* Internal highlight */
+    
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-primary:hover {
-    background: #2563eb;
     transform: translateY(-2px);
+    filter: brightness(1.15); /* Subtle lift instead of harsh color change */
+    box-shadow: 0 15px 30px -5px rgba(59, 130, 246, 0.5), 
+                inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
+.btn-primary:active {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);}
 /* ==================== SECURE SIDEBAR SHELL ==================== */
 .sidebar {
     width: 100%;
@@ -692,45 +739,67 @@ video#localVideo {
 
 .theme-option:hover { transform: scale(1.1); border-color: var(--accent-blue); }
 
-/*CHAT BACKGROUND*/
-/* Chat Background Defaults */
-.chat-box {
-    transition: background 0.6s ease;
-    background-size: cover;
-    background-position: center;
+/* Header - Integrated into the Glassmorphism */
+.settings-header {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    background: rgba(255, 255, 255, 0.03); /* Subtle glass light */
+    border-bottom: 1px solid var(--border-color);
+    justify-content: space-between;
 }
 
-/* 1. "NEURAL GRID" - Technical, Aerospace feel */
-.bg-grid {
-    background-color: #050608;
-    background-image: 
-        linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px);
-    background-size: 40px 40px;
-}
+.header-left { display: flex; align-items: center; gap: 16px; }
 
-/* 2. "AETHER" - Soft, moody, deep gradient */
-.bg-aether {
-    background: radial-gradient(circle at 70% 30%, #1e3a8a 0%, #020617 70%);
-}
-
-/* 3. "CARBON" - Minimalist luxury */
-.bg-carbon {
-    background-color: #050505;
-    background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
-    background-size: 20px 20px;
-}
-
-/* 4. "VOID" - Pure deep black */
-.bg-void { background-color: #000000; }
-
-.bg-grid-options { display: flex; gap: 12px; margin-bottom: 20px; }
-.bg-option {
-    width: 60px; height: 60px; border-radius: 12px;
-    cursor: pointer; border: 2px solid transparent;
+/* The "Command" Button */
+.nav-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
     transition: all 0.3s ease;
 }
-.bg-option:hover { transform: translateY(-3px); border-color: var(--accent-blue); }
+
+.nav-btn:hover {
+    background: var(--accent-blue);
+    transform: scale(1.05);
+}
+
+.settings-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+}
+
+.settings-title i {
+    color: var(--accent-blue);
+    margin-right: 8px;
+}
+
+/* Avatar Container - Centered and Spaced */
+.profile-avatar-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 0;
+    gap: 12px;
+}
+
+.avatar-helper-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
 
 /* The Reaction Menu Container */
 .msg-bubble {
@@ -761,3 +830,4 @@ video#localVideo {
     opacity: 1;
     visibility: visible;
 }
+
